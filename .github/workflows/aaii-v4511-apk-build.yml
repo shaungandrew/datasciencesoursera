@@ -49,7 +49,7 @@ jobs:
         run: |
           set -euo pipefail
           cat aaii-apk-v4511/v4511.patch.gz.b64 | tr -d '\r\n' | base64 -d > /tmp/v4511.patch.gz
-          echo "88ad2e5de827a9981578d708ee475ffb7b860c2b777c636636592ecc36218cac  /tmp/v4511.patch.gz" | sha256sum -c -
+          echo "3f9deede3436f3865d5051d6d5e16aadd8caea800b549e0d3642e7fba1b57cb6  /tmp/v4511.patch.gz" | sha256sum -c -
           gzip -d -c /tmp/v4511.patch.gz > /tmp/v4511.patch
           cd /tmp/aaii-source
           patch -p1 < /tmp/v4511.patch
