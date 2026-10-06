@@ -1,0 +1,81 @@
+name: Build AAII Panyar Home V4.5.9 APK
+
+on:
+  push:
+    branches:
+      - aaii-apk-v459-release-build
+    paths:
+      - '.github/workflows/aaii-v459-apk-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout build payload
+        uses: actions/checkout@v4
+
+      - name: Restore V4.5.7 base source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat aaii-apk-v457/source.b64.* | tr -d '\r\n' | base64 -d > /tmp/aaii-source.zip
+          echo "21080623ed954022265e5fb3aa01c809d74a851b033069b09aecd97bfe1d1b7a  /tmp/aaii-source.zip" | sha256sum -c -
+          unzip -t /tmp/aaii-source.zip
+          rm -rf /tmp/aaii-source
+          mkdir -p /tmp/aaii-source
+          unzip -q /tmp/aaii-source.zip -d /tmp/aaii-source
+
+      - name: Apply V4.5.9 patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat aaii-apk-v459/v459.patch.gz.b64 | tr -d '\r\n' | base64 -d | gzip -d > /tmp/v459.patch
+          cd /tmp/aaii-source
+          patch -p1 < /tmp/v459.patch
+          grep -R "versionName" -n app/build.gradle
+          test -f app/src/main/java/asia/aaii/studentnative/RemoteImage.java
+          test -f README_V4_5_9.md
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK 35
+        shell: bash
+        run: |
+          set -e
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build V4.5.9 debug APK
+        working-directory: /tmp/aaii-source
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Prepare APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          cp /tmp/aaii-source/app/build/outputs/apk/debug/app-debug.apk release/AAII_Panyar_Home_Native_V4_5_9_MOOC_FREEHUB_ADVISER.apk
+          sha256sum release/AAII_Panyar_Home_Native_V4_5_9_MOOC_FREEHUB_ADVISER.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AAII-Panyar-Home-V4.5.9-APK
+          path: release/AAII_Panyar_Home_Native_V4_5_9_MOOC_FREEHUB_ADVISER.apk
+          if-no-files-found: error
+          retention-days: 14
