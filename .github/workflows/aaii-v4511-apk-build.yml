@@ -96,3 +96,5 @@ jobs:
           path: release/AAII_Panyar_Home_Native_V4_5_11_REAL_MOOC_PHONE_SYNC.apk
           if-no-files-found: error
           retention-days: 14
+
+# rebuild-exact-category-sync
