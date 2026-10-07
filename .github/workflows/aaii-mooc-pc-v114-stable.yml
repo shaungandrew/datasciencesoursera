@@ -74,7 +74,8 @@ jobs:
 
           $c = $c -replace 'LoginButton\.IsEnabled = false; LoginStatus\.Text = "Connecting…";','LoginButton.IsEnabled = false; LoginStatus.Text = "Connecting…"; App.LogText("Login requested");'
           $c = $c -replace '_settings\.Save\(\); _api\.SetEndpoint\(_settings\.ApiBaseUrl, _settings\.Token\);\s*ShowShell\(\); await LoadHomeSafeAsync\(\);','_settings.Save(); _api.SetEndpoint(_settings.ApiBaseUrl, _settings.Token); App.LogText("Login success; opening shell"); ShowShell(); await LoadHomeSafeAsync();'
-          $c = $c -replace 'async Task LoadHomeAsync\(\)\s*\{','async Task LoadHomeAsync()\r\n    {\r\n        App.LogText("LoadHomeAsync begin");'
+          $homeReplacement = "async Task LoadHomeAsync()`r`n    {`r`n        App.LogText(`"LoadHomeAsync begin`");"
+          $c = $c -replace 'async Task LoadHomeAsync\(\)\s*\{',$homeReplacement
 
           Set-Content $mw $c -Encoding utf8
 
