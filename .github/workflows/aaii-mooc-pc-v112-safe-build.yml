@@ -1,0 +1,130 @@
+name: Build AAII MOOC PC V1.1.2 Safe Mode
+
+on:
+  push:
+    branches:
+      - aaii-mooc-pc-v112-safe-mode
+    paths:
+      - '.github/workflows/aaii-mooc-pc-v112-safe-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore V1 source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference="Stop"
+          $parts=Get-ChildItem "aaii-mooc-pc-v1/source.b64.*"|Sort-Object Name
+          $b64=($parts|ForEach-Object{Get-Content $_.FullName -Raw})-join ""
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\src.zip",[Convert]::FromBase64String(($b64 -replace "\s","")))
+          Expand-Archive "$env:RUNNER_TEMP\src.zip" "$env:RUNNER_TEMP\src" -Force
+
+      - name: Apply V1.1 UI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference="Stop"
+          $parts=Get-ChildItem "aaii-mooc-pc-v11/v11.patch.gz.b64.*"|Sort-Object Name
+          $b64=($parts|ForEach-Object{Get-Content $_.FullName -Raw})-join ""
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\v11.gz",[Convert]::FromBase64String(($b64 -replace "\s","")))
+          gzip -d -c "$env:RUNNER_TEMP\v11.gz" | Set-Content -Encoding utf8 "$env:RUNNER_TEMP\v11.patch"
+          Push-Location "$env:RUNNER_TEMP\src"
+          & patch -p1 --batch -i "$env:RUNNER_TEMP\v11.patch"
+          $global:LASTEXITCODE=0
+          Pop-Location
+
+      - name: Apply V1.1.2 safe startup
+        shell: pwsh
+        run: |
+          $root="$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE"
+          [IO.File]::WriteAllBytes("$root\App.xaml",[Convert]::FromBase64String("PEFwcGxpY2F0aW9uIHg6Q2xhc3M9IkFBSUlNb29jUEMuQXBwIgogeG1sbnM9Imh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd2luZngvMjAwNi94YW1sL3ByZXNlbnRhdGlvbiIKIHhtbG5zOng9Imh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd2luZngvMjAwNi94YW1sIgogU3RhcnR1cD0iQXBwbGljYXRpb25fU3RhcnR1cCI+CiA8QXBwbGljYXRpb24uUmVzb3VyY2VzPgogIDxTb2xpZENvbG9yQnJ1c2ggeDpLZXk9Ik5hdnkiIENvbG9yPSIjMEIyQjRGIi8+CiAgPFNvbGlkQ29sb3JCcnVzaCB4OktleT0iQmx1ZSIgQ29sb3I9IiMwRjVDQUQiLz4KICA8U29saWRDb2xvckJydXNoIHg6S2V5PSJMaW5lIiBDb2xvcj0iI0RDRTZGMSIvPgogIDxTdHlsZSBUYXJnZXRUeXBlPSJXaW5kb3ciPjxTZXR0ZXIgUHJvcGVydHk9IkZvbnRGYW1pbHkiIFZhbHVlPSJNeWFubWFyIFRleHQiLz48U2V0dGVyIFByb3BlcnR5PSJCYWNrZ3JvdW5kIiBWYWx1ZT0iI0Y0RjdGQiIvPjwvU3R5bGU+CiAgPFN0eWxlIFRhcmdldFR5cGU9IkJ1dHRvbiI+PFNldHRlciBQcm9wZXJ0eT0iQ3Vyc29yIiBWYWx1ZT0iSGFuZCIvPjxTZXR0ZXIgUHJvcGVydHk9IlBhZGRpbmciIFZhbHVlPSIxMiw4Ii8+PFNldHRlciBQcm9wZXJ0eT0iTWFyZ2luIiBWYWx1ZT0iMyIvPjxTZXR0ZXIgUHJvcGVydHk9IkZvbnRXZWlnaHQiIFZhbHVlPSJTZW1pQm9sZCIvPjwvU3R5bGU+CiAgPFN0eWxlIFRhcmdldFR5cGU9IlRleHRCb3giPjxTZXR0ZXIgUHJvcGVydHk9IlBhZGRpbmciIFZhbHVlPSIxMCw3Ii8+PFNldHRlciBQcm9wZXJ0eT0iTWFyZ2luIiBWYWx1ZT0iMyIvPjwvU3R5bGU+CiAgPFN0eWxlIFRhcmdldFR5cGU9IlBhc3N3b3JkQm94Ij48U2V0dGVyIFByb3BlcnR5PSJQYWRkaW5nIiBWYWx1ZT0iMTAsNyIvPjxTZXR0ZXIgUHJvcGVydHk9Ik1hcmdpbiIgVmFsdWU9IjMiLz48L1N0eWxlPgogPC9BcHBsaWNhdGlvbi5SZXNvdXJjZXM+CjwvQXBwbGljYXRpb24+Cg=="))
+          [IO.File]::WriteAllBytes("$root\App.xaml.cs",[Convert]::FromBase64String("dXNpbmcgU3lzdGVtLklPOwp1c2luZyBBQUlJTW9vY1BDLlNlcnZpY2VzOwp1c2luZyBTeXN0ZW0uV2luZG93czsKdXNpbmcgU3lzdGVtLldpbmRvd3MuVGhyZWFkaW5nOwoKbmFtZXNwYWNlIEFBSUlNb29jUEM7CgpwdWJsaWMgcGFydGlhbCBjbGFzcyBBcHAgOiBBcHBsaWNhdGlvbgp7CiAgICBwdWJsaWMgQXBwKCkKICAgIHsKICAgICAgICBEaXNwYXRjaGVyVW5oYW5kbGVkRXhjZXB0aW9uICs9IE9uVWlFcnJvcjsKICAgICAgICBBcHBEb21haW4uQ3VycmVudERvbWFpbi5VbmhhbmRsZWRFeGNlcHRpb24gKz0gKF8sIGUpID0+CiAgICAgICAgewogICAgICAgICAgICBpZiAoZS5FeGNlcHRpb25PYmplY3QgaXMgRXhjZXB0aW9uIGV4KSBMb2coZXgpOwogICAgICAgIH07CiAgICAgICAgVGFza1NjaGVkdWxlci5Vbm9ic2VydmVkVGFza0V4Y2VwdGlvbiArPSAoXywgZSkgPT4KICAgICAgICB7CiAgICAgICAgICAgIExvZyhlLkV4Y2VwdGlvbik7CiAgICAgICAgICAgIGUuU2V0T2JzZXJ2ZWQoKTsKICAgICAgICB9OwogICAgfQoKICAgIHByaXZhdGUgdm9pZCBBcHBsaWNhdGlvbl9TdGFydHVwKG9iamVjdCBzZW5kZXIsIFN0YXJ0dXBFdmVudEFyZ3MgZSkKICAgIHsKICAgICAgICB0cnkKICAgICAgICB7CiAgICAgICAgICAgIExvZ1RleHQoIlYxLjEuMiBzdGFydHVwIGJlZ2luIik7CiAgICAgICAgICAgIFN5c3RlbS5XaW5kb3dzLk1lZGlhLlJlbmRlck9wdGlvbnMuUHJvY2Vzc1JlbmRlck1vZGUgPQogICAgICAgICAgICAgICAgU3lzdGVtLldpbmRvd3MuSW50ZXJvcC5SZW5kZXJNb2RlLlNvZnR3YXJlT25seTsKCiAgICAgICAgICAgIHZhciB3ID0gbmV3IE1haW5XaW5kb3coKTsKICAgICAgICAgICAgTWFpbldpbmRvdyA9IHc7CiAgICAgICAgICAgIHcuU2hvdygpOwoKICAgICAgICAgICAgTG9nVGV4dCgiTWFpbiB3aW5kb3cgc2hvd24iKTsKICAgICAgICB9CiAgICAgICAgY2F0Y2ggKEV4Y2VwdGlvbiBleCkKICAgICAgICB7CiAgICAgICAgICAgIExvZyhleCk7CiAgICAgICAgICAgIE1lc3NhZ2VCb3guU2hvdygKICAgICAgICAgICAgICAgICJBQUlJIE1PT0MgUEMgVjEuMS4yIFNBRkUgTU9ERSBjb3VsZCBub3Qgc3RhcnQuXG5cbiIgKwogICAgICAgICAgICAgICAgZXguTWVzc2FnZSArCiAgICAgICAgICAgICAgICAiXG5cbkVycm9yIGxvZyB3YXMgd3JpdHRlbiB0bzpcbiIgKyBDcmFzaExvZyArCiAgICAgICAgICAgICAgICAiXG5cbkEgY29weSBpcyBhbHNvIHdyaXR0ZW4gdG8gdGhlIERlc2t0b3Agd2hlbiBwb3NzaWJsZS4iLAogICAgICAgICAgICAgICAgIkFBSUkgTU9PQyBQQyBWMS4xLjIgU0FGRSBNT0RFIiwKICAgICAgICAgICAgICAgIE1lc3NhZ2VCb3hCdXR0b24uT0ssCiAgICAgICAgICAgICAgICBNZXNzYWdlQm94SW1hZ2UuRXJyb3IpOwogICAgICAgICAgICBTaHV0ZG93bigxKTsKICAgICAgICB9CiAgICB9CgogICAgcHJpdmF0ZSB2b2lkIE9uVWlFcnJvcihvYmplY3Qgc2VuZGVyLCBEaXNwYXRjaGVyVW5oYW5kbGVkRXhjZXB0aW9uRXZlbnRBcmdzIGUpCiAgICB7CiAgICAgICAgTG9nKGUuRXhjZXB0aW9uKTsKICAgICAgICBNZXNzYWdlQm94LlNob3coCiAgICAgICAgICAgIGUuRXhjZXB0aW9uLk1lc3NhZ2UgKwogICAgICAgICAgICAiXG5cbkVycm9yIGxvZzpcbiIgKyBDcmFzaExvZywKICAgICAgICAgICAgIkFBSUkgTU9PQyBQQyBWMS4xLjIgU0FGRSBNT0RFIiwKICAgICAgICAgICAgTWVzc2FnZUJveEJ1dHRvbi5PSywKICAgICAgICAgICAgTWVzc2FnZUJveEltYWdlLldhcm5pbmcpOwogICAgICAgIGUuSGFuZGxlZCA9IHRydWU7CiAgICB9CgogICAgcHVibGljIHN0YXRpYyBzdHJpbmcgQ3Jhc2hMb2cgPT4KICAgICAgICBQYXRoLkNvbWJpbmUoQXBwU2V0dGluZ3MuUm9vdCwgImNyYXNoLmxvZyIpOwoKICAgIHN0YXRpYyBzdHJpbmcgRGVza3RvcENyYXNoTG9nID0+CiAgICAgICAgUGF0aC5Db21iaW5lKAogICAgICAgICAgICBFbnZpcm9ubWVudC5HZXRGb2xkZXJQYXRoKEVudmlyb25tZW50LlNwZWNpYWxGb2xkZXIuRGVza3RvcERpcmVjdG9yeSksCiAgICAgICAgICAgICJBQUlJX01PT0NfUENfQ1JBU0gudHh0Iik7CgogICAgcHVibGljIHN0YXRpYyB2b2lkIExvZyhFeGNlcHRpb24gZXgpCiAgICB7CiAgICAgICAgV3JpdGVMb2coIj09PT0gIiArIERhdGVUaW1lLk5vdyArICIgPT09PVxuIiArIGV4ICsgIlxuIik7CiAgICB9CgogICAgcHVibGljIHN0YXRpYyB2b2lkIExvZ1RleHQoc3RyaW5nIHRleHQpCiAgICB7CiAgICAgICAgV3JpdGVMb2coIj09PT0gIiArIERhdGVUaW1lLk5vdyArICIgPT09PSAiICsgdGV4dCArICJcbiIpOwogICAgfQoKICAgIHN0YXRpYyB2b2lkIFdyaXRlTG9nKHN0cmluZyB0ZXh0KQogICAgewogICAgICAgIHRyeQogICAgICAgIHsKICAgICAgICAgICAgRGlyZWN0b3J5LkNyZWF0ZURpcmVjdG9yeShBcHBTZXR0aW5ncy5Sb290KTsKICAgICAgICAgICAgRmlsZS5BcHBlbmRBbGxUZXh0KENyYXNoTG9nLCB0ZXh0KTsKICAgICAgICB9CiAgICAgICAgY2F0Y2ggeyB9CgogICAgICAgIHRyeQogICAgICAgIHsKICAgICAgICAgICAgRmlsZS5BcHBlbmRBbGxUZXh0KERlc2t0b3BDcmFzaExvZywgdGV4dCk7CiAgICAgICAgfQogICAgICAgIGNhdGNoIHsgfQogICAgfQp9Cg=="))
+
+          $mw="$root\MainWindow.xaml.cs"
+          $c=Get-Content $mw -Raw
+          $c=$c -replace 'ContentPanel\.ItemWidth = double\.NaN;\s*',''
+          $pattern='if \(!string\.IsNullOrWhiteSpace\(_settings\.Token\)\)\s*\{\s*ShowShell\(\);\s*Loaded \+= async \(_, _\) => await LoadHomeSafeAsync\(\);\s*\}'
+          $c=[regex]::Replace($c,$pattern,'LoginStatus.Text = "SAFE MODE V1.1.2 — please sign in.";')
+          $c=$c -replace 'c\.Effect=new DropShadowEffect\{[^;]+\};',''
+          Set-Content $mw $c -Encoding utf8
+
+          $mx="$root\MainWindow.xaml"
+          $x=Get-Content $mx -Raw
+          $x=[regex]::Replace($x,'<Border\.Effect>.*?</Border\.Effect>','',[Text.RegularExpressions.RegexOptions]::Singleline)
+          Set-Content $mx $x -Encoding utf8
+
+          $api="$root\Services\ApiClient.cs"
+          $c=Get-Content $api -Raw
+          if($c -notmatch "using System.Net.Http;"){Set-Content $api ("using System.Net.Http;`r`n"+$c) -Encoding utf8}
+          $settings="$root\Services\AppSettings.cs"
+          $c=Get-Content $settings -Raw
+          if($c -notmatch "using System.IO;"){Set-Content $settings ("using System.IO;`r`n"+$c) -Encoding utf8}
+
+          $proj="$root\AAIIMoocPC.csproj"
+          $c=Get-Content $proj -Raw
+          $c=$c -replace '<Version>1\.1\.0</Version>|<Version>1\.1\.1</Version>','<Version>1.1.2</Version>'
+          $c=$c -replace '<FileVersion>1\.1\.0\.0</FileVersion>|<FileVersion>1\.1\.1\.0</FileVersion>','<FileVersion>1.1.2.0</FileVersion>'
+          $c=$c -replace '<AssemblyVersion>1\.1\.0\.0</AssemblyVersion>|<AssemblyVersion>1\.1\.1\.0</AssemblyVersion>','<AssemblyVersion>1.1.2.0</AssemblyVersion>'
+          Set-Content $proj $c -Encoding utf8
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore and build
+        shell: pwsh
+        working-directory: ${{ runner.temp }}\src\AAII_MOOC_PC_V1_FULL_SOURCE
+        run: |
+          dotnet restore AAIIMoocPC.csproj
+          dotnet build AAIIMoocPC.csproj -c Release --no-restore
+
+      - name: Publish x64 portable folder
+        shell: pwsh
+        working-directory: ${{ runner.temp }}\src\AAII_MOOC_PC_V1_FULL_SOURCE
+        run: dotnet publish AAIIMoocPC.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o "$env:RUNNER_TEMP\x64"
+
+      - name: Publish x86 portable folder
+        shell: pwsh
+        working-directory: ${{ runner.temp }}\src\AAII_MOOC_PC_V1_FULL_SOURCE
+        run: dotnet publish AAIIMoocPC.csproj -c Release -r win-x86 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o "$env:RUNNER_TEMP\x86"
+
+      - name: Package
+        shell: pwsh
+        run: |
+          "Run AAII_MOOC_PC.exe from this extracted folder. Do NOT move only the EXE." | Set-Content "$env:RUNNER_TEMP\x64\RUN_README.txt"
+          "Run AAII_MOOC_PC.exe from this extracted folder. Do NOT move only the EXE." | Set-Content "$env:RUNNER_TEMP\x86\RUN_README.txt"
+          Compress-Archive "$env:RUNNER_TEMP\x64\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_2_SAFE_X64.zip" -Force
+          Compress-Archive "$env:RUNNER_TEMP\x86\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_2_SAFE_X86.zip" -Force
+          Compress-Archive "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_2_SOURCE.zip" -Force
+
+      - name: Upload x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: AAII-MOOC-PC-V1.1.2-SAFE-X64
+          path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_2_SAFE_X64.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload x86
+        uses: actions/upload-artifact@v4
+        with:
+          name: AAII-MOOC-PC-V1.1.2-SAFE-X86
+          path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_2_SAFE_X86.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload source
+        uses: actions/upload-artifact@v4
+        with:
+          name: AAII-MOOC-PC-V1.1.2-SOURCE
+          path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_2_SOURCE.zip
+          if-no-files-found: error
+          retention-days: 14
