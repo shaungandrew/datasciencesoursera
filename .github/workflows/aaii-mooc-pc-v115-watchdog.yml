@@ -114,33 +114,19 @@ jobs:
 
       - name: Add watchdog and package
         shell: pwsh
-        run: |
-          $readme=@"
-AAII MOOC PC V1.1.5 — Compatibility + System Watchdog
-
-IMPORTANT:
-1. Extract ALL files.
-2. Double-click START_DIAGNOSTIC.cmd, not only AAII_MOOC_PC.exe.
-3. Keep the black watchdog window open.
-4. In the launcher click OPEN FULL MOOC UI.
-5. Do not press TEST SERVER until the Full UI is stable.
-6. If the program disappears, the watchdog writes:
-   Desktop\AAII_MOOC_PC_SYSTEM_DIAG.txt
-
-That file includes:
-- process exit code
-- recent Windows Application Error events
-- .NET Runtime events
-- Windows Error Reporting events
-- Windows Defender events
-- managed AAII crash log
-
-This version also:
-- keeps the launcher visible
-- disables static drop shadows
-- forces WPF software rendering
-- disables auto server/API load before manual login
-"@
+        run: |          $readme = @(
+            "AAII MOOC PC V1.1.5 — Compatibility + System Watchdog",
+            "",
+            "IMPORTANT:",
+            "1. Extract ALL files.",
+            "2. Double-click START_DIAGNOSTIC.cmd, not only AAII_MOOC_PC.exe.",
+            "3. Keep the black watchdog window open.",
+            "4. In the launcher click OPEN FULL MOOC UI.",
+            "5. Do not press TEST SERVER until the Full UI is stable.",
+            "6. If the program disappears, the watchdog writes Desktop\AAII_MOOC_PC_SYSTEM_DIAG.txt.",
+            "",
+            "The diagnostic file includes process exit code, Windows Application Error, .NET Runtime, WER, Defender, and managed AAII logs."
+          ) -join "`r`n"
           foreach($d in @("$env:RUNNER_TEMP\x64","$env:RUNNER_TEMP\x86")){
             Copy-Item "aaii-mooc-pc-v115\WATCHDOG.ps1" "$d\WATCHDOG.ps1" -Force
             Copy-Item "aaii-mooc-pc-v115\START_DIAGNOSTIC.cmd" "$d\START_DIAGNOSTIC.cmd" -Force
