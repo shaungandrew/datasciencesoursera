@@ -30,6 +30,15 @@ jobs:
           if($hash -ne "d2cba38223c58d2b2b73cd19ff5378794accd8a7459956e9e26c4d3447e413a3"){ throw "Source ZIP checksum mismatch: $hash" }
           Expand-Archive "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_FULL_SOURCE.zip" "$env:RUNNER_TEMP\src" -Force
 
+      - name: Apply compile fix
+        shell: pwsh
+        run: |
+          $p = "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\Services\ApiClient.cs"
+          $c = Get-Content $p -Raw
+          if($c -notmatch "using System.Net.Http;"){
+            Set-Content -Path $p -Value ("using System.Net.Http;`r`n" + $c)
+          }
+
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v4
         with:
