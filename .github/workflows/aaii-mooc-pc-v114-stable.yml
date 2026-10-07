@@ -52,7 +52,7 @@ jobs:
           $mw="$root\MainWindow.xaml.cs"
           $c=Get-Content $mw -Raw
 
-          $c=$c -replace 'bool _exitConfirmed;','bool _exitConfirmed;\r\n    public bool ForceCloseForAppExit { get; set; }'
+          $c=$c -replace 'bool _exitConfirmed;',("bool _exitConfirmed;" + "`r`n    public bool ForceCloseForAppExit { get; set; }")
 
           $auto='if \(!string\.IsNullOrWhiteSpace\(_settings\.Token\)\)\s*\{\s*ShowShell\(\);\s*Loaded \+= async \(_, _\) => await LoadHomeSafeAsync\(\);\s*\}'
           $c=[regex]::Replace($c,$auto,'LoginStatus.Text = "V1.1.4 Stable · sign in to connect to server.";')
@@ -61,33 +61,7 @@ jobs:
           $c=$c -replace 'c\.Effect=new DropShadowEffect\{BlurRadius=12,ShadowDepth=3,Opacity=\.10,Color=Colors\.SlateGray\};',''
 
           $old='void MainWindow_Closing\(object\? sender,System\.ComponentModel\.CancelEventArgs e\)\{if\(_exitConfirmed\)\{Application\.Current\.Shutdown\(\);return;\}var r=MessageBox\.Show\("Exit AAII MOOC PC V1\.1\?","AAII MOOC PC V1\.1",MessageBoxButton\.YesNo,MessageBoxImage\.Question\);if\(r!=MessageBoxResult\.Yes\)\{e\.Cancel=true;return;\}_exitConfirmed=true;Application\.Current\.Shutdown\(\);\}'
-          $new=@'
-void MainWindow_Closing(object? sender,System.ComponentModel.CancelEventArgs e)
-    {
-        App.LogText("MainWindow Closing requested");
-        if(ForceCloseForAppExit)
-        {
-            App.LogText("MainWindow close allowed for application exit");
-            return;
-        }
-
-        var r=MessageBox.Show(
-            "Close the full MOOC window and return to the launcher?",
-            "AAII MOOC PC V1.1.4",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-
-        if(r!=MessageBoxResult.Yes)
-        {
-            e.Cancel=true;
-            App.LogText("MainWindow close cancelled by user");
-            return;
-        }
-
-        _exitConfirmed=true;
-        App.LogText("MainWindow close confirmed; returning to launcher");
-    }
-'@
+          $new='void MainWindow_Closing(object? sender,System.ComponentModel.CancelEventArgs e){App.LogText("MainWindow Closing requested");if(ForceCloseForAppExit){App.LogText("MainWindow close allowed for application exit");return;}var r=MessageBox.Show("Close the full MOOC window and return to the launcher?","AAII MOOC PC V1.1.4",MessageBoxButton.YesNo,MessageBoxImage.Question);if(r!=MessageBoxResult.Yes){e.Cancel=true;App.LogText("MainWindow close cancelled by user");return;}_exitConfirmed=true;App.LogText("MainWindow close confirmed; returning to launcher");}'
           $c=[regex]::Replace($c,$old,$new)
 
           Set-Content $mw $c -Encoding utf8
