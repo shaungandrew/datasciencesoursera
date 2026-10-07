@@ -1,9 +1,9 @@
-name: YCTA APK Build V3
+name: YCTA APK Build V4
 
 on:
   push:
     branches:
-      - 'chatgpt-ycta-v3-run-*'
+      - 'chatgpt-ycta-v4-run-*'
 
 permissions:
   contents: read
@@ -24,10 +24,10 @@ jobs:
         run: |
           cd ycta-build
           gradle --no-daemon :app:assembleDebug --stacktrace
-          cp app/build/outputs/apk/debug/app-debug.apk ../YCTA_Member_Native_V3.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../YCTA_Member_Native_V4_SmartCard.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: YCTA_Member_Native_V3_APK
-          path: YCTA_Member_Native_V3.apk
+          name: YCTA_Member_Native_V4_SmartCard_APK
+          path: YCTA_Member_Native_V4_SmartCard.apk
           if-no-files-found: error
