@@ -1,9 +1,9 @@
-name: Build AAII MOOC PC V1.1.6 StackOverflow Fix
+name: Build AAII MOOC PC V1.1.7 In-App Video
 
 on:
   push:
     branches:
-      - aaii-mooc-pc-v116-stackoverflow-fix
+      - aaii-mooc-pc-v117-inapp-video
     paths:
       - '.github/workflows/aaii-mooc-pc-v114-stable.yml'
   workflow_dispatch:
@@ -40,7 +40,7 @@ jobs:
           $global:LASTEXITCODE = 0
           Pop-Location
 
-      - name: Apply V1.1.6 fixes
+      - name: Apply V1.1.7 fixes
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -50,7 +50,7 @@ jobs:
           Copy-Item "aaii-mooc-pc-v115\App.xaml.cs" "$root\App.xaml.cs" -Force
 
           $app = Get-Content "$root\App.xaml.cs" -Raw
-          $app = $app -replace 'V1\.1\.5','V1.1.6'
+          $app = $app -replace 'V1\.1\.5','V1.1.7'
           Set-Content "$root\App.xaml.cs" $app -Encoding utf8
 
           $mw = "$root\MainWindow.xaml.cs"
@@ -59,7 +59,7 @@ jobs:
           $c = $c -replace 'bool _exitConfirmed;',("bool _exitConfirmed;" + "`r`n    public bool ForceCloseForAppExit { get; set; }")
 
           $auto = 'if \(!string\.IsNullOrWhiteSpace\(_settings\.Token\)\)\s*\{\s*ShowShell\(\);\s*Loaded \+= async \(_, _\) => await LoadHomeSafeAsync\(\);\s*\}'
-          $c = [regex]::Replace($c,$auto,'LoginStatus.Text = "V1.1.6 · sign in manually.";')
+          $c = [regex]::Replace($c,$auto,'LoginStatus.Text = "V1.1.7 · sign in manually.";')
 
           $c = $c -replace 'ContentPanel\.ItemWidth = double\.NaN;\s*',''
           $c = $c -replace 'c\.Effect=new DropShadowEffect\{BlurRadius=12,ShadowDepth=3,Opacity=\.10,Color=Colors\.SlateGray\};',''
@@ -69,7 +69,7 @@ jobs:
           $c = $c.Replace($oldAction,$newAction)
 
           $oldClose = 'void MainWindow_Closing\(object\? sender,System\.ComponentModel\.CancelEventArgs e\)\{if\(_exitConfirmed\)\{Application\.Current\.Shutdown\(\);return;\}var r=MessageBox\.Show\("Exit AAII MOOC PC V1\.1\?","AAII MOOC PC V1\.1",MessageBoxButton\.YesNo,MessageBoxImage\.Question\);if\(r!=MessageBoxResult\.Yes\)\{e\.Cancel=true;return;\}_exitConfirmed=true;Application\.Current\.Shutdown\(\);\}'
-          $newClose = 'void MainWindow_Closing(object? sender,System.ComponentModel.CancelEventArgs e){App.LogText("MainWindow Closing requested");if(ForceCloseForAppExit){App.LogText("MainWindow close allowed for application exit");return;}var r=MessageBox.Show("Close the full MOOC window and return to the launcher?","AAII MOOC PC V1.1.6",MessageBoxButton.YesNo,MessageBoxImage.Question);if(r!=MessageBoxResult.Yes){e.Cancel=true;App.LogText("MainWindow close cancelled by user");return;}_exitConfirmed=true;App.LogText("MainWindow close confirmed; returning to launcher");}'
+          $newClose = 'void MainWindow_Closing(object? sender,System.ComponentModel.CancelEventArgs e){App.LogText("MainWindow Closing requested");if(ForceCloseForAppExit){App.LogText("MainWindow close allowed for application exit");return;}var r=MessageBox.Show("Close the full MOOC window and return to the launcher?","AAII MOOC PC V1.1.7",MessageBoxButton.YesNo,MessageBoxImage.Question);if(r!=MessageBoxResult.Yes){e.Cancel=true;App.LogText("MainWindow close cancelled by user");return;}_exitConfirmed=true;App.LogText("MainWindow close confirmed; returning to launcher");}'
           $c = [regex]::Replace($c,$oldClose,$newClose)
 
           $c = $c -replace 'LoginButton\.IsEnabled = false; LoginStatus\.Text = "Connecting…";','LoginButton.IsEnabled = false; LoginStatus.Text = "Connecting…"; App.LogText("Login requested");'
@@ -82,7 +82,7 @@ jobs:
           $mx = "$root\MainWindow.xaml"
           $x = Get-Content $mx -Raw
           $x = [regex]::Replace($x,'<Border\.Effect>.*?</Border\.Effect>','',[Text.RegularExpressions.RegexOptions]::Singleline)
-          $x = $x -replace 'Title="AAII MOOC Learning Hub — PC V1\.1"','Title="AAII MOOC Learning Hub — PC V1.1.6"'
+          $x = $x -replace 'Title="AAII MOOC Learning Hub — PC V1\.1"','Title="AAII MOOC Learning Hub — PC V1.1.7"'
           Set-Content $mx $x -Encoding utf8
 
           $api = "$root\Services\ApiClient.cs"
@@ -95,12 +95,15 @@ jobs:
 
           $proj = "$root\AAIIMoocPC.csproj"
           $a = Get-Content $proj -Raw
-          $a = $a -replace '<Version>1\.1\.0</Version>','<Version>1.1.6</Version>'
-          $a = $a -replace '<FileVersion>1\.1\.0\.0</FileVersion>','<FileVersion>1.1.6.0</FileVersion>'
-          $a = $a -replace '<AssemblyVersion>1\.1\.0\.0</AssemblyVersion>','<AssemblyVersion>1.1.6.0</AssemblyVersion>'
+          $a = $a -replace '<Version>1\.1\.0</Version>','<Version>1.1.7</Version>'
+          $a = $a -replace '<FileVersion>1\.1\.0\.0</FileVersion>','<FileVersion>1.1.7.0</FileVersion>'
+          $a = $a -replace '<AssemblyVersion>1\.1\.0\.0</AssemblyVersion>','<AssemblyVersion>1.1.7.0</AssemblyVersion>'
           Set-Content $proj $a -Encoding utf8
 
-          Set-Content "$root\README_V1.1.6.txt" -Value "AAII MOOC PC V1.1.6 StackOverflow Fix`r`n`r`nRoot cause fixed: the Func<Task> ActionCard overload could call itself recursively and terminate the process with Windows exception 0xC00000FD (stack overflow) when the Home dashboard was built after login.`r`n`r`nV1.1.6 explicitly converts the async card action to System.Action, preventing recursive overload selection.`r`n`r`nExtract all files. Start with START_DIAGNOSTIC.cmd for the first test." -Encoding utf8
+          Copy-Item "aaii-mooc-pc-v117\DirectCourseDetailWindow.xaml" "$root\DirectCourseDetailWindow.xaml" -Force
+          Copy-Item "aaii-mooc-pc-v117\DirectCourseDetailWindow.xaml.cs" "$root\DirectCourseDetailWindow.xaml.cs" -Force
+
+          Set-Content "$root\README_V1.1.7.txt" -Value "AAII MOOC PC V1.1.7 — In-App Video Player`r`n`r`nYouTube lessons and Google Drive video lessons now play inside the software using Microsoft Edge WebView2.`r`n`r`nFeatures: in-app player, YouTube URL normalization, Google Drive preview normalization, Reload, Open External fallback, YouTube Referer support, and WebView2 unavailable fallback.`r`n`r`nGoogle Drive files must be viewable by the signed-in user or shared appropriately.`r`n`r`nV1.1.6 stack overflow fix is retained." -Encoding utf8
 
           if($c.Contains('Border ActionCard(string icon,string title,string sub,Func<Task> action)=>ActionCard(icon,title,sub,()=>_ = SafeAsync(action));')){ throw "Recursive ActionCard overload still present" }
           if($c -notmatch 'Action fire='){ throw "ActionCard stack fix missing" }
@@ -111,6 +114,11 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Add WebView2 player package
+        shell: pwsh
+        working-directory: ${{ runner.temp }}\src\AAII_MOOC_PC_V1_FULL_SOURCE
+        run: dotnet add AAIIMoocPC.csproj package Microsoft.Web.WebView2
 
       - name: Restore and build
         shell: pwsh
@@ -135,34 +143,34 @@ jobs:
           foreach($d in @("$env:RUNNER_TEMP\x64","$env:RUNNER_TEMP\x86")){
             Copy-Item "aaii-mooc-pc-v115\WATCHDOG.ps1" "$d\WATCHDOG.ps1" -Force
             Copy-Item "aaii-mooc-pc-v115\START_DIAGNOSTIC.cmd" "$d\START_DIAGNOSTIC.cmd" -Force
-            Copy-Item "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\README_V1.1.6.txt" "$d\README_V1.1.6.txt" -Force
+            Copy-Item "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\README_V1.1.7.txt" "$d\README_V1.1.7.txt" -Force
           }
-          Compress-Archive "$env:RUNNER_TEMP\x64\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_6_FIXED_X64.zip" -Force
-          Compress-Archive "$env:RUNNER_TEMP\x86\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_6_FIXED_X86.zip" -Force
-          Compress-Archive "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_6_SOURCE.zip" -Force
-          Get-FileHash "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_6_FIXED_X64.zip" -Algorithm SHA256
-          Get-FileHash "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_6_FIXED_X86.zip" -Algorithm SHA256
+          Compress-Archive "$env:RUNNER_TEMP\x64\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_7_INAPP_VIDEO_X64.zip" -Force
+          Compress-Archive "$env:RUNNER_TEMP\x86\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_7_INAPP_VIDEO_X86.zip" -Force
+          Compress-Archive "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_7_SOURCE.zip" -Force
+          Get-FileHash "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_7_INAPP_VIDEO_X64.zip" -Algorithm SHA256
+          Get-FileHash "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_7_INAPP_VIDEO_X86.zip" -Algorithm SHA256
 
       - name: Upload x64
         uses: actions/upload-artifact@v4
         with:
-          name: AAII-MOOC-PC-V1.1.6-FIXED-X64
-          path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_6_FIXED_X64.zip
+          name: AAII-MOOC-PC-V1.1.7-INAPP-VIDEO-X64
+          path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_7_INAPP_VIDEO_X64.zip
           if-no-files-found: error
           retention-days: 14
 
       - name: Upload x86
         uses: actions/upload-artifact@v4
         with:
-          name: AAII-MOOC-PC-V1.1.6-FIXED-X86
-          path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_6_FIXED_X86.zip
+          name: AAII-MOOC-PC-V1.1.7-INAPP-VIDEO-X86
+          path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_7_INAPP_VIDEO_X86.zip
           if-no-files-found: error
           retention-days: 14
 
       - name: Upload source
         uses: actions/upload-artifact@v4
         with:
-          name: AAII-MOOC-PC-V1.1.6-SOURCE
-          path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_6_SOURCE.zip
+          name: AAII-MOOC-PC-V1.1.7-SOURCE
+          path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_7_SOURCE.zip
           if-no-files-found: error
           retention-days: 14
