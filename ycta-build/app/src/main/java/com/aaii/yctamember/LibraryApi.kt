@@ -1,6 +1,8 @@
 package com.aaii.yctamember
 
 import android.content.Context
+import android.os.Build
+import android.provider.Settings
 import okhttp3.FormBody
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
@@ -46,11 +48,26 @@ class LibraryApi(private val context: Context) {
     fun clearToken() = prefs.edit().remove(TOKEN_KEY).apply()
     private fun token(): String = prefs.getString(TOKEN_KEY, "").orEmpty()
 
+    private fun deviceId(): String =
+        Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+            ?.takeIf { it.isNotBlank() } ?: "android-" + Build.MODEL.replace(" ", "-")
+
+    private fun deviceLabel(): String =
+        listOf(Build.MANUFACTURER, Build.MODEL)
+            .filter { it.isNotBlank() }
+            .joinToString(" ")
+            .ifBlank { "Android Device" }
+
     fun login(activation: String, username: String, password: String): String {
+        if (activation.isBlank() && (username.isBlank() || password.isBlank())) {
+            error("Enter Activation Code OR Username + Password.")
+        }
         val body = FormBody.Builder().apply {
             if (activation.isNotBlank()) add("activation_code", activation)
             if (username.isNotBlank()) add("username", username)
             if (password.isNotBlank()) add("password", password)
+            add("device_id", deviceId())
+            add("device_label", deviceLabel())
         }.build()
         val request = Request.Builder()
             .url(API_BASE + "login.php")
@@ -74,29 +91,38 @@ class LibraryApi(private val context: Context) {
         categoryId: String = "",
         authorId: String = ""
     ): List<Book> {
-        val params = linkedMapOf("library" to library)
-        if (query.isNotBlank()) params["q"] = query
+        val params = linkedMapOf(
+            "library" to library,
+            "mode" to "all",
+            "format" to "all",
+            "limit" to "120"
+        )
         if (categoryId.isNotBlank()) params["category_id"] = categoryId
         if (authorId.isNotBlank()) params["author_id"] = authorId
         val json = getJson("library.php", params)
-        val array = findArray(json, listOf("books", "items", "results", "data"))
-        return parseBooks(array)
+        val books = parseBooks(findArray(json, listOf("books", "items", "results", "data")))
+        val q = query.trim().lowercase()
+        if (q.isBlank()) return books
+        return books.filter { b ->
+            listOf(b.title, b.author, b.category, b.description)
+                .any { it.lowercase().contains(q) }
+        }
     }
 
     fun fetchCategories(library: String): List<NamedItem> {
-        val json = getJson("categories.php", mapOf("library" to library))
+        val json = getJson("categories.php", linkedMapOf("library" to library, "limit" to "100"))
         val array = findArray(json, listOf("categories", "items", "results", "data"))
         return parseNamed(array)
     }
 
     fun fetchAuthors(library: String): List<NamedItem> {
-        val json = getJson("authors.php", mapOf("library" to library))
+        val json = getJson("authors.php", linkedMapOf("library" to library, "limit" to "500"))
         val array = findArray(json, listOf("authors", "writers", "items", "results", "data"))
         return parseNamed(array)
     }
 
     fun fetchAudio(library: String): List<MediaItem> {
-        val json = getJson("media_channels.php", mapOf("library" to library, "type" to "audio_books"))
+        val json = getJson("media_channels.php", linkedMapOf("library" to library, "type" to "audio_books", "limit" to "100"))
         val array = findArray(json, listOf("audio_books", "channels", "media", "items", "results", "data"))
         val out = mutableListOf<MediaItem>()
         for (i in 0 until array.length()) {
@@ -159,7 +185,8 @@ class LibraryApi(private val context: Context) {
         val b = Request.Builder()
             .url(url)
             .header("Accept", "application/json,*/*")
-            .header("User-Agent", "YCTA-Library-Native/5.0 Android")
+            .header("Referer", WEB_BASE)
+            .header("User-Agent", "YCTA-Library-Native/5.1 Android")
         val t = token()
         if (t.isNotBlank()) b.header("X-API-Token", t)
         return b
@@ -169,7 +196,15 @@ class LibraryApi(private val context: Context) {
         client.newCall(request).execute().use { response ->
             val text = response.body?.string().orEmpty()
             if (response.code == 401 || response.code == 403 || text.contains("LOGIN_REQUIRED", true) || text.contains("Invalid token", true)) {
-                throw AuthException("Library login required.")
+                clearToken()
+                throw AuthException("Library login / activation is required.")
+            }
+            if (response.code == 422) {
+                val detail = runCatching {
+                    val obj = JSONObject(text)
+                    findString(obj, listOf("message", "error", "detail"))
+                }.getOrDefault("")
+                error(if (detail.isBlank()) "Library request validation failed (HTTP 422)." else detail)
             }
             if (!response.isSuccessful) error("Server HTTP ${response.code}")
             return text
