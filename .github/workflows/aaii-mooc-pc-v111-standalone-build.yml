@@ -47,123 +47,25 @@ jobs:
           if($code -gt 1){ throw "Patch failed with exit code $code" }
           $global:LASTEXITCODE=0
           Pop-Location
-          if(!(Test-Path "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\README_V1.1.txt")){ throw "V1.1 patch did not apply" }
 
       - name: Apply V1.1.1 startup and standalone fixes
         shell: pwsh
         run: |
           $root="$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE"
-          $app=@'
-using System.IO;
-using AAIIMoocPC.Services;
-using System.Windows;
-using System.Windows.Threading;
-namespace AAIIMoocPC;
-public partial class App : Application
-{
- public App()
- {
-  DispatcherUnhandledException += OnUiError;
-  AppDomain.CurrentDomain.UnhandledException += (_,e)=>{ if(e.ExceptionObject is Exception ex) Log(ex); };
-  TaskScheduler.UnobservedTaskException += (_,e)=>{ Log(e.Exception); e.SetObserved(); };
- }
- private async void Application_Startup(object sender, StartupEventArgs e)
- {
-  ShutdownMode = ShutdownMode.OnExplicitShutdown;
-  SplashWindow? splash = null;
-  try
-  {
-   LogText("Startup begin");
-   System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
-   try
-   {
-    splash = new SplashWindow();
-    splash.Show();
-    await Task.Delay(650);
-   }
-   catch(Exception splashEx)
-   {
-    Log(splashEx);
-    splash = null;
-   }
-   var w = new MainWindow();
-   MainWindow = w;
-   w.Show();
-   try { splash?.Close(); } catch { }
-   LogText("Main window shown");
-  }
-  catch(Exception ex)
-  {
-   try { splash?.Close(); } catch { }
-   Log(ex);
-   MessageBox.Show("AAII MOOC PC V1.1.1 could not start.\n\n"+ex.Message+"\n\nCrash log:\n"+CrashLog,
-     "AAII MOOC PC V1.1.1", MessageBoxButton.OK, MessageBoxImage.Error);
-  }
- }
- private void OnUiError(object s, DispatcherUnhandledExceptionEventArgs e)
- {
-  Log(e.Exception);
-  MessageBox.Show(e.Exception.Message+"\n\nCrash log:\n"+CrashLog,
-    "AAII MOOC PC V1.1.1", MessageBoxButton.OK, MessageBoxImage.Warning);
-  e.Handled = true;
- }
- public static string CrashLog => Path.Combine(AppSettings.Root,"crash.log");
- public static void Log(Exception ex)
- {
-  try
-  {
-   Directory.CreateDirectory(AppSettings.Root);
-   File.AppendAllText(CrashLog,"==== "+DateTime.Now+" ====\n"+ex+"\n");
-  } catch {}
- }
- public static void LogText(string text)
- {
-  try
-  {
-   Directory.CreateDirectory(AppSettings.Root);
-   File.AppendAllText(CrashLog,"==== "+DateTime.Now+" ==== "+text+"\n");
-  } catch {}
- }
-}
-'@
-          Set-Content -Path "$root\App.xaml.cs" -Value $app -Encoding utf8
-
+          [IO.File]::WriteAllBytes("$root\App.xaml.cs",[Convert]::FromBase64String("dXNpbmcgU3lzdGVtLklPOwp1c2luZyBBQUlJTW9vY1BDLlNlcnZpY2VzOwp1c2luZyBTeXN0ZW0uV2luZG93czsKdXNpbmcgU3lzdGVtLldpbmRvd3MuVGhyZWFkaW5nOwpuYW1lc3BhY2UgQUFJSU1vb2NQQzsKcHVibGljIHBhcnRpYWwgY2xhc3MgQXBwIDogQXBwbGljYXRpb24KewogcHVibGljIEFwcCgpCiB7CiAgRGlzcGF0Y2hlclVuaGFuZGxlZEV4Y2VwdGlvbiArPSBPblVpRXJyb3I7CiAgQXBwRG9tYWluLkN1cnJlbnREb21haW4uVW5oYW5kbGVkRXhjZXB0aW9uICs9IChfLGUpPT57IGlmKGUuRXhjZXB0aW9uT2JqZWN0IGlzIEV4Y2VwdGlvbiBleCkgTG9nKGV4KTsgfTsKICBUYXNrU2NoZWR1bGVyLlVub2JzZXJ2ZWRUYXNrRXhjZXB0aW9uICs9IChfLGUpPT57IExvZyhlLkV4Y2VwdGlvbik7IGUuU2V0T2JzZXJ2ZWQoKTsgfTsKIH0KIHByaXZhdGUgYXN5bmMgdm9pZCBBcHBsaWNhdGlvbl9TdGFydHVwKG9iamVjdCBzZW5kZXIsIFN0YXJ0dXBFdmVudEFyZ3MgZSkKIHsKICBTaHV0ZG93bk1vZGUgPSBTaHV0ZG93bk1vZGUuT25FeHBsaWNpdFNodXRkb3duOwogIFNwbGFzaFdpbmRvdz8gc3BsYXNoID0gbnVsbDsKICB0cnkKICB7CiAgIExvZ1RleHQoIlN0YXJ0dXAgYmVnaW4iKTsKICAgU3lzdGVtLldpbmRvd3MuTWVkaWEuUmVuZGVyT3B0aW9ucy5Qcm9jZXNzUmVuZGVyTW9kZSA9IFN5c3RlbS5XaW5kb3dzLkludGVyb3AuUmVuZGVyTW9kZS5Tb2Z0d2FyZU9ubHk7CiAgIHRyeQogICB7CiAgICBzcGxhc2ggPSBuZXcgU3BsYXNoV2luZG93KCk7CiAgICBzcGxhc2guU2hvdygpOwogICAgYXdhaXQgVGFzay5EZWxheSg2NTApOwogICB9CiAgIGNhdGNoKEV4Y2VwdGlvbiBzcGxhc2hFeCkKICAgewogICAgTG9nKHNwbGFzaEV4KTsKICAgIHNwbGFzaCA9IG51bGw7CiAgIH0KICAgdmFyIHcgPSBuZXcgTWFpbldpbmRvdygpOwogICBNYWluV2luZG93ID0gdzsKICAgdy5TaG93KCk7CiAgIHRyeSB7IHNwbGFzaD8uQ2xvc2UoKTsgfSBjYXRjaCB7IH0KICAgTG9nVGV4dCgiTWFpbiB3aW5kb3cgc2hvd24iKTsKICB9CiAgY2F0Y2goRXhjZXB0aW9uIGV4KQogIHsKICAgdHJ5IHsgc3BsYXNoPy5DbG9zZSgpOyB9IGNhdGNoIHsgfQogICBMb2coZXgpOwogICBNZXNzYWdlQm94LlNob3coIkFBSUkgTU9PQyBQQyBWMS4xLjEgY291bGQgbm90IHN0YXJ0LlxcblxcbiIrZXguTWVzc2FnZSsiXFxuXFxuQ3Jhc2ggbG9nOlxcbiIrQ3Jhc2hMb2csCiAgICAgIkFBSUkgTU9PQyBQQyBWMS4xLjEiLCBNZXNzYWdlQm94QnV0dG9uLk9LLCBNZXNzYWdlQm94SW1hZ2UuRXJyb3IpOwogIH0KIH0KIHByaXZhdGUgdm9pZCBPblVpRXJyb3Iob2JqZWN0IHMsIERpc3BhdGNoZXJVbmhhbmRsZWRFeGNlcHRpb25FdmVudEFyZ3MgZSkKIHsKICBMb2coZS5FeGNlcHRpb24pOwogIE1lc3NhZ2VCb3guU2hvdyhlLkV4Y2VwdGlvbi5NZXNzYWdlKyJcXG5cXG5DcmFzaCBsb2c6XFxuIitDcmFzaExvZywKICAgICJBQUlJIE1PT0MgUEMgVjEuMS4xIiwgTWVzc2FnZUJveEJ1dHRvbi5PSywgTWVzc2FnZUJveEltYWdlLldhcm5pbmcpOwogIGUuSGFuZGxlZCA9IHRydWU7CiB9CiBwdWJsaWMgc3RhdGljIHN0cmluZyBDcmFzaExvZyA9PiBQYXRoLkNvbWJpbmUoQXBwU2V0dGluZ3MuUm9vdCwiY3Jhc2gubG9nIik7CiBwdWJsaWMgc3RhdGljIHZvaWQgTG9nKEV4Y2VwdGlvbiBleCkKIHsKICB0cnkKICB7CiAgIERpcmVjdG9yeS5DcmVhdGVEaXJlY3RvcnkoQXBwU2V0dGluZ3MuUm9vdCk7CiAgIEZpbGUuQXBwZW5kQWxsVGV4dChDcmFzaExvZywiPT09PSAiK0RhdGVUaW1lLk5vdysiID09PT1cXG4iK2V4KyJcXG4iKTsKICB9IGNhdGNoIHt9CiB9CiBwdWJsaWMgc3RhdGljIHZvaWQgTG9nVGV4dChzdHJpbmcgdGV4dCkKIHsKICB0cnkKICB7CiAgIERpcmVjdG9yeS5DcmVhdGVEaXJlY3RvcnkoQXBwU2V0dGluZ3MuUm9vdCk7CiAgIEZpbGUuQXBwZW5kQWxsVGV4dChDcmFzaExvZywiPT09PSAiK0RhdGVUaW1lLk5vdysiID09PT0gIit0ZXh0KyJcXG4iKTsKICB9IGNhdGNoIHt9CiB9Cn0K"))
+          [IO.File]::WriteAllBytes("$root\README_V1.1.1.txt",[Convert]::FromBase64String("QUFJSSBNT09DIFBDIFYxLjEuMSDigJQgU3RhbmRhbG9uZSBGaXgKCk1haW4gZml4OgotIFRoZSBvbGQgc2VwYXJhdGVseSBkb3dubG9hZGVkIEVYRSB3YXMgb25seSB0aGUgc21hbGwgYXBwIGhvc3QgYW5kIHN0aWxsIG5lZWRlZCB0aGUgb3RoZXIgcHVibGlzaGVkIERMTC9ydW50aW1lIGZpbGVzIGJlc2lkZSBpdC4KLSBUaGlzIGJ1aWxkIHB1Ymxpc2hlcyBhIFRSVUUgc2VsZi1jb250YWluZWQgc2luZ2xlLWZpbGUgV2luZG93cyB4NjQgRVhFLgotIFlvdSBjYW4gcnVuIEFBSUlfTU9PQ19QQ19WMV8xXzFfU1RBTkRBTE9ORS5leGUgZGlyZWN0bHkuCgpTdGFydHVwIGhhcmRlbmluZzoKLSBTcGxhc2ggZmFpbHVyZSBubyBsb25nZXIgY2xvc2VzIHRoZSBhcHBsaWNhdGlvbi4KLSBTdGFydHVwIGFuZCBVSSBleGNlcHRpb25zIGFyZSB3cml0dGVuIHRvOgogICVMT0NBTEFQUERBVEElXEFBSUlNb29jUENcY3Jhc2gubG9nCi0gSWYgc3RhcnR1cCBmYWlscyBhZnRlciBtYW5hZ2VkIGNvZGUgYmVnaW5zLCBhIHZpc2libGUgZXJyb3IgZGlhbG9nIHNob3dzIHRoZSBjcmFzaC1sb2cgcGF0aC4KClNlcnZlcjoKaHR0cHM6Ly9hYWlpLmFzaWEvZWR1L21vb2MvYXBpLwo="))
           $api="$root\Services\ApiClient.cs"
           $c=Get-Content $api -Raw
-          if($c -notmatch [regex]::Escape("using System.Net.Http;")){
-            Set-Content -Path $api -Value ("using System.Net.Http;`r`n"+$c) -Encoding utf8
-          }
-
+          if($c -notmatch [regex]::Escape("using System.Net.Http;")){ Set-Content -Path $api -Value ("using System.Net.Http;`r`n"+$c) -Encoding utf8 }
           $settings="$root\Services\AppSettings.cs"
           $c=Get-Content $settings -Raw
-          if($c -notmatch [regex]::Escape("using System.IO;")){
-            Set-Content -Path $settings -Value ("using System.IO;`r`n"+$c) -Encoding utf8
-          }
-
+          if($c -notmatch [regex]::Escape("using System.IO;")){ Set-Content -Path $settings -Value ("using System.IO;`r`n"+$c) -Encoding utf8 }
           $proj="$root\AAIIMoocPC.csproj"
           $c=Get-Content $proj -Raw
           $c=$c -replace '<Version>1\.1\.0</Version>','<Version>1.1.1</Version>'
           $c=$c -replace '<FileVersion>1\.1\.0\.0</FileVersion>','<FileVersion>1.1.1.0</FileVersion>'
           $c=$c -replace '<AssemblyVersion>1\.1\.0\.0</AssemblyVersion>','<AssemblyVersion>1.1.1.0</AssemblyVersion>'
           Set-Content -Path $proj -Value $c -Encoding utf8
-
-          @'
-AAII MOOC PC V1.1.1 — Standalone Fix
-
-Main fix:
-- The old separately downloaded EXE was only the small app host and still needed the other published DLL/runtime files beside it.
-- This build publishes a TRUE self-contained single-file Windows x64 EXE.
-- You can run AAII_MOOC_PC_V1_1_1_STANDALONE.exe directly.
-
-Startup hardening:
-- Splash failure no longer closes the application.
-- Startup and UI exceptions are written to:
-  %LOCALAPPDATA%\AAIIMoocPC\crash.log
-- If startup fails after managed code begins, a visible error dialog shows the crash-log path.
-
-Server:
-https://aaii.asia/edu/mooc/api/
-'@ | Set-Content "$root\README_V1.1.1.txt" -Encoding utf8
 
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v4
@@ -183,8 +85,7 @@ https://aaii.asia/edu/mooc/api/
       - name: Publish true standalone single EXE
         shell: pwsh
         working-directory: ${{ runner.temp }}\src\AAII_MOOC_PC_V1_FULL_SOURCE
-        run: |
-          dotnet publish AAIIMoocPC.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -p:DebugSymbols=false -p:PublishReadyToRun=false -o "$env:RUNNER_TEMP\single"
+        run: dotnet publish AAIIMoocPC.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -p:DebugSymbols=false -p:PublishReadyToRun=false -o "$env:RUNNER_TEMP\single"
 
       - name: Package outputs
         shell: pwsh
