@@ -42,7 +42,10 @@ jobs:
           if($hash -ne "39bb42cb5de1f387aafd7c5f8caa891c580d5278c8dc712d91680165b2c3453d"){ throw "V1.1 patch checksum mismatch: $hash" }
           gzip -d -c "$env:RUNNER_TEMP\v11.patch.gz" | Set-Content -Encoding utf8 "$env:RUNNER_TEMP\v11.patch"
           Push-Location "$env:RUNNER_TEMP\src"
-          cmd /c "patch -p1 --batch -i \"$env:RUNNER_TEMP\v11.patch\" || exit /b 0"
+          & patch -p1 --batch -i "$env:RUNNER_TEMP\v11.patch"
+          $code=$LASTEXITCODE
+          if($code -gt 1){ throw "Patch failed with exit code $code" }
+          $global:LASTEXITCODE=0
           Pop-Location
           if(!(Test-Path "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\README_V1.1.txt")){ throw "V1.1 patch did not apply" }
 
