@@ -1,9 +1,9 @@
-name: YCTA APK Build V4
+name: KILO TAXI Booking APK V1
 
 on:
   push:
     branches:
-      - 'chatgpt-ycta-v4-run-*'
+      - 'chatgpt-kilotaxi-booking-v1-*'
 
 permissions:
   contents: read
@@ -22,12 +22,12 @@ jobs:
           gradle-version: '8.9'
       - name: Build APK
         run: |
-          cd ycta-build
+          cd kilo-booking
           gradle --no-daemon :app:assembleDebug --stacktrace
-          cp app/build/outputs/apk/debug/app-debug.apk ../YCTA_Member_Native_V4_SmartCard.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../KILO_TAXI_CallCenter_Booking_V1.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: YCTA_Member_Native_V4_SmartCard_APK
-          path: YCTA_Member_Native_V4_SmartCard.apk
+          name: KILO_TAXI_CallCenter_Booking_V1_APK
+          path: KILO_TAXI_CallCenter_Booking_V1.apk
           if-no-files-found: error
