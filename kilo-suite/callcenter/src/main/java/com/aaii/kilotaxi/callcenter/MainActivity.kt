@@ -71,7 +71,73 @@ class MainActivity:ComponentActivity(){
         },margin())
     }
 
-    private fun renderBookings(box:LinearLayout,a:JSONArray){box.removeAllViews();if(a.length()==0){box.addView(TextView(this).apply{text="No bookings"});return};for(i in 0 until a.length()){val b=a.getJSONObject(i);val id=b.optInt("id");val c=card();c.addView(TextView(this).apply{text=b.optString("booking_code")+" ["+b.optString("status")+"]";textSize=17f;setTypeface(typeface,Typeface.BOLD)});c.addView(TextView(this).apply{text=b.optString("passenger_name")+" • "+b.optString("passenger_phone")+"\n"+b.optString("pickup")+" → "+b.optString("destination")+"\nDriver: "+b.optString("driver_name")+" "+b.optString("vehicle_no")+"\nKM: "+b.optString("distance_km")+" • Fare: "+b.optString("fare")});if(b.optString("status") !in listOf("COMPLETED","CANCELLED")){c.addView(Button(this).apply{text="Auto Reassign";isAllCaps=false;setOnClickListener{postToast("operator_reassign",JSONObject().put("booking_id",id))}});c.addView(Button(this).apply{text="Reset Pickup OTP";isAllCaps=false;setOnClickListener{call({api.post("operator_reset_otp",JSONObject().put("booking_id",id),tok())}){toast("New OTP: "+it.optString("pickup_otp"))}});c.addView(Button(this).apply{text="Cancel";isAllCaps=false;setOnClickListener{postToast("operator_cancel",JSONObject().put("booking_id",id).put("reason","Call Center cancelled"))}})};box.addView(c,margin())}}
+    private fun renderBookings(box: LinearLayout, a: JSONArray) {
+        box.removeAllViews()
+        if (a.length() == 0) {
+            box.addView(TextView(this).apply { text = "No bookings" })
+            return
+        }
+
+        for (i in 0 until a.length()) {
+            val b = a.getJSONObject(i)
+            val id = b.optInt("id")
+            val c = card()
+
+            c.addView(TextView(this).apply {
+                text = b.optString("booking_code") + " [" + b.optString("status") + "]"
+                textSize = 17f
+                setTypeface(typeface, Typeface.BOLD)
+            })
+
+            c.addView(TextView(this).apply {
+                text = b.optString("passenger_name") + " • " + b.optString("passenger_phone") +
+                    "\n" + b.optString("pickup") + " → " + b.optString("destination") +
+                    "\nDriver: " + b.optString("driver_name") + " " + b.optString("vehicle_no") +
+                    "\nKM: " + b.optString("distance_km") + " • Fare: " + b.optString("fare")
+            })
+
+            if (b.optString("status") !in listOf("COMPLETED", "CANCELLED")) {
+                c.addView(Button(this).apply {
+                    text = "Auto Reassign"
+                    isAllCaps = false
+                    setOnClickListener {
+                        postToast("operator_reassign", JSONObject().put("booking_id", id))
+                    }
+                })
+
+                c.addView(Button(this).apply {
+                    text = "Reset Pickup OTP"
+                    isAllCaps = false
+                    setOnClickListener {
+                        call({
+                            api.post(
+                                "operator_reset_otp",
+                                JSONObject().put("booking_id", id),
+                                tok()
+                            )
+                        }) { result ->
+                            toast("New OTP: " + result.optString("pickup_otp"))
+                        }
+                    }
+                })
+
+                c.addView(Button(this).apply {
+                    text = "Cancel"
+                    isAllCaps = false
+                    setOnClickListener {
+                        postToast(
+                            "operator_cancel",
+                            JSONObject()
+                                .put("booking_id", id)
+                                .put("reason", "Call Center cancelled")
+                        )
+                    }
+                })
+            }
+
+            box.addView(c, margin())
+        }
+    }
 
     private fun loadMap(m:MapView,district:String){call({api.get("operator_map_drivers",mapOf("district" to district),tok())}){j->m.overlays.clear();val a=j.optJSONArray("drivers")?:JSONArray();var first:GeoPoint?=null;for(i in 0 until a.length()){val d=a.getJSONObject(i);val lat=d.optDouble("lat",Double.NaN);val lng=d.optDouble("lng",Double.NaN);if(lat.isNaN()||lng.isNaN())continue;val p=GeoPoint(lat,lng);if(first==null)first=p;Marker(m).apply{position=p;title=(d.optString("name").ifBlank{"YCTA Driver"})+" • "+d.optString("ycta_member_id")+" • "+d.optString("vehicle_no");snippet=d.optString("availability")+" • "+d.optString("last_seen");setAnchor(Marker.ANCHOR_CENTER,Marker.ANCHOR_BOTTOM);m.overlays.add(this)}};first?.let{m.controller.animateTo(it)};m.invalidate();toast(a.length().toString()+" driver(s)")}}
     private fun marker(m:MapView,lat:Double,lng:Double,t:String){Marker(m).apply{position=GeoPoint(lat,lng);title=t;setAnchor(Marker.ANCHOR_CENTER,Marker.ANCHOR_BOTTOM);m.overlays.add(this)};m.invalidate()}
