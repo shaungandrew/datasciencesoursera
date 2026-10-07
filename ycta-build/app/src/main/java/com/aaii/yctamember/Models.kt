@@ -3,10 +3,16 @@ package com.aaii.yctamember
 data class Member(
     val name: String = "",
     val memberId: String = "",
+    val driverLicense: String = "",
     val joinedDate: String = "",
     val vehicleNo: String = "",
     val cityNo: String = "",
+    val phone: String = "",
+    val nrc: String = "",
+    val address: String = "",
     val district: String = "",
+    val photoUrl: String = "",
+    val cvUrl: String = "",
     val profileUrl: String
 )
 
