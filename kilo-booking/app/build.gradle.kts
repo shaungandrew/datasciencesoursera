@@ -9,8 +9,8 @@ android {
         applicationId = "com.aaii.kilotaxi"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "2.0.0"
+        versionCode = 3
+        versionName = "3.0.0"
     }
     buildTypes { release { isMinifyEnabled = false } }
     compileOptions {
@@ -23,4 +23,5 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.activity:activity-ktx:1.10.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
 }

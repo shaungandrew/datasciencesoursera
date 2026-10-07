@@ -1,9 +1,9 @@
-name: KILO TAXI Booking APK V2
+name: KILO TAXI Core V3 APK
 
 on:
   push:
     branches:
-      - 'chatgpt-kilotaxi-booking-v2-*'
+      - 'chatgpt-kilotaxi-core-v3-*'
 
 permissions:
   contents: read
@@ -24,10 +24,10 @@ jobs:
         run: |
           cd kilo-booking
           gradle --no-daemon :app:assembleDebug --stacktrace
-          cp app/build/outputs/apk/debug/app-debug.apk ../KILO_TAXI_YCTA_Booking_V2.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../KILO_TAXI_Core_V3_YCTA.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: KILO_TAXI_YCTA_Booking_V2_APK
-          path: KILO_TAXI_YCTA_Booking_V2.apk
+          name: KILO_TAXI_Core_V3_YCTA_APK
+          path: KILO_TAXI_Core_V3_YCTA.apk
           if-no-files-found: error
