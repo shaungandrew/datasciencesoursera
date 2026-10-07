@@ -33,10 +33,16 @@ jobs:
       - name: Apply compile fix
         shell: pwsh
         run: |
-          $p = "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\Services\ApiClient.cs"
-          $c = Get-Content $p -Raw
-          if($c -notmatch "using System.Net.Http;"){
-            Set-Content -Path $p -Value ("using System.Net.Http;`r`n" + $c)
+          $fixes = @(
+            @{ Path="$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\Services\ApiClient.cs"; Using="using System.Net.Http;" },
+            @{ Path="$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\Services\AppSettings.cs"; Using="using System.IO;" },
+            @{ Path="$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\App.xaml.cs"; Using="using System.IO;" }
+          )
+          foreach($f in $fixes){
+            $c = Get-Content $f.Path -Raw
+            if($c -notmatch [regex]::Escape($f.Using)){
+              Set-Content -Path $f.Path -Value ($f.Using + "`r`n" + $c)
+            }
           }
 
       - name: Set up .NET 8
