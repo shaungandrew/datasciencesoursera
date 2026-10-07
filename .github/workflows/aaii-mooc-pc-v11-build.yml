@@ -49,6 +49,21 @@ jobs:
           Pop-Location
           if(!(Test-Path "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\README_V1.1.txt")){ throw "V1.1 patch did not apply" }
 
+      - name: Apply compile namespace fixes
+        shell: pwsh
+        run: |
+          $fixes = @(
+            @{ Path="$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\Services\ApiClient.cs"; Using="using System.Net.Http;" },
+            @{ Path="$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\Services\AppSettings.cs"; Using="using System.IO;" },
+            @{ Path="$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\App.xaml.cs"; Using="using System.IO;" }
+          )
+          foreach($f in $fixes){
+            $c = Get-Content $f.Path -Raw
+            if($c -notmatch [regex]::Escape($f.Using)){
+              Set-Content -Path $f.Path -Value ($f.Using + "`r`n" + $c)
+            }
+          }
+
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v4
         with:
