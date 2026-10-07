@@ -1,9 +1,9 @@
-name: Build AAII MOOC PC V1.1.4 Stable
+name: Build AAII MOOC PC V1.1.5 Watchdog
 
 on:
   push:
     branches:
-      - aaii-mooc-pc-v114-stable
+      - aaii-mooc-pc-v115-watchdog
     paths:
       - '.github/workflows/aaii-mooc-pc-v114-stable.yml'
   workflow_dispatch:
@@ -40,14 +40,14 @@ jobs:
           $global:LASTEXITCODE=0
           Pop-Location
 
-      - name: Apply V1.1.4 lifecycle fix
+      - name: Apply V1.1.5 watchdog fix
         shell: pwsh
         run: |
           $ErrorActionPreference="Stop"
           $root="$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE"
 
           Copy-Item "aaii-mooc-pc-v113\App.xaml" "$root\App.xaml" -Force
-          Copy-Item "aaii-mooc-pc-v114\App.xaml.cs" "$root\App.xaml.cs" -Force
+          Copy-Item "aaii-mooc-pc-v115\App.xaml.cs" "$root\App.xaml.cs" -Force
 
           $mw="$root\MainWindow.xaml.cs"
           $c=Get-Content $mw -Raw
@@ -55,13 +55,13 @@ jobs:
           $c=$c -replace 'bool _exitConfirmed;',("bool _exitConfirmed;" + "`r`n    public bool ForceCloseForAppExit { get; set; }")
 
           $auto='if \(!string\.IsNullOrWhiteSpace\(_settings\.Token\)\)\s*\{\s*ShowShell\(\);\s*Loaded \+= async \(_, _\) => await LoadHomeSafeAsync\(\);\s*\}'
-          $c=[regex]::Replace($c,$auto,'LoginStatus.Text = "V1.1.4 Stable · sign in to connect to server.";')
+          $c=[regex]::Replace($c,$auto,'LoginStatus.Text = "V1.1.5 Stable · sign in to connect to server.";')
 
           $c=$c -replace 'ContentPanel\.ItemWidth = double\.NaN;\s*',''
           $c=$c -replace 'c\.Effect=new DropShadowEffect\{BlurRadius=12,ShadowDepth=3,Opacity=\.10,Color=Colors\.SlateGray\};',''
 
           $old='void MainWindow_Closing\(object\? sender,System\.ComponentModel\.CancelEventArgs e\)\{if\(_exitConfirmed\)\{Application\.Current\.Shutdown\(\);return;\}var r=MessageBox\.Show\("Exit AAII MOOC PC V1\.1\?","AAII MOOC PC V1\.1",MessageBoxButton\.YesNo,MessageBoxImage\.Question\);if\(r!=MessageBoxResult\.Yes\)\{e\.Cancel=true;return;\}_exitConfirmed=true;Application\.Current\.Shutdown\(\);\}'
-          $new='void MainWindow_Closing(object? sender,System.ComponentModel.CancelEventArgs e){App.LogText("MainWindow Closing requested");if(ForceCloseForAppExit){App.LogText("MainWindow close allowed for application exit");return;}var r=MessageBox.Show("Close the full MOOC window and return to the launcher?","AAII MOOC PC V1.1.4",MessageBoxButton.YesNo,MessageBoxImage.Question);if(r!=MessageBoxResult.Yes){e.Cancel=true;App.LogText("MainWindow close cancelled by user");return;}_exitConfirmed=true;App.LogText("MainWindow close confirmed; returning to launcher");}'
+          $new='void MainWindow_Closing(object? sender,System.ComponentModel.CancelEventArgs e){App.LogText("MainWindow Closing requested");if(ForceCloseForAppExit){App.LogText("MainWindow close allowed for application exit");return;}var r=MessageBox.Show("Close the full MOOC window and return to the launcher?","AAII MOOC PC V1.1.5",MessageBoxButton.YesNo,MessageBoxImage.Question);if(r!=MessageBoxResult.Yes){e.Cancel=true;App.LogText("MainWindow close cancelled by user");return;}_exitConfirmed=true;App.LogText("MainWindow close confirmed; returning to launcher");}'
           $c=[regex]::Replace($c,$old,$new)
 
           Set-Content $mw $c -Encoding utf8
@@ -76,12 +76,12 @@ jobs:
 
           $proj="$root\AAIIMoocPC.csproj"
           $a=Get-Content $proj -Raw
-          $a=$a -replace '<Version>1\.1\.0</Version>','<Version>1.1.4</Version>'
-          $a=$a -replace '<FileVersion>1\.1\.0\.0</FileVersion>','<FileVersion>1.1.4.0</FileVersion>'
-          $a=$a -replace '<AssemblyVersion>1\.1\.0\.0</AssemblyVersion>','<AssemblyVersion>1.1.4.0</AssemblyVersion>'
+          $a=$a -replace '<Version>1\.1\.0</Version>','<Version>1.1.5</Version>'
+          $a=$a -replace '<FileVersion>1\.1\.0\.0</FileVersion>','<FileVersion>1.1.5.0</FileVersion>'
+          $a=$a -replace '<AssemblyVersion>1\.1\.0\.0</AssemblyVersion>','<AssemblyVersion>1.1.5.0</AssemblyVersion>'
           Set-Content $proj $a -Encoding utf8
 
-          Set-Content "$root\\README_V1.1.4.txt" -Value "AAII MOOC PC V1.1.4 — Stable Lifecycle Fix`r`n`r`nServer is not contacted when Full MOOC UI first opens.`r`nClosing Full MOOC UI returns to the launcher instead of shutting down the whole app.`r`nLifecycle and crash logs are copied to Desktop as AAII_MOOC_PC_CRASH.txt.`r`n`r`nExtract the whole ZIP, run AAII_MOOC_PC.exe, click OPEN FULL MOOC UI, then sign in manually." -Encoding utf8
+          Set-Content "$root\\README_V1.1.5.txt" -Value "AAII MOOC PC V1.1.5 Watchdog`r`n`r`nExtract ALL files and start with START_DIAGNOSTIC.cmd. Keep the watchdog console open. If the app disappears, send Desktop\\AAII_MOOC_PC_SYSTEM_DIAG.txt. Server is not contacted before manual login or TEST SERVER." -Encoding utf8
 
           if($c -notmatch 'ForceCloseForAppExit'){throw "MainWindow property patch failed"}
           if($c -notmatch 'returning to launcher'){throw "MainWindow closing patch failed"}
@@ -112,8 +112,8 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          Copy-Item "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\README_V1.1.4.txt" "$env:RUNNER_TEMP\x64\README_V1.1.4.txt" -Force
-          Copy-Item "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\README_V1.1.4.txt" "$env:RUNNER_TEMP\x86\README_V1.1.4.txt" -Force
+          Copy-Item "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\README_V1.1.5.txt" "$env:RUNNER_TEMP\x64\README_V1.1.5.txt" -Force
+          Copy-Item "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\README_V1.1.5.txt" "$env:RUNNER_TEMP\x86\README_V1.1.5.txt" -Force
           Compress-Archive "$env:RUNNER_TEMP\x64\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_4_STABLE_X64.zip" -Force
           Compress-Archive "$env:RUNNER_TEMP\x86\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_4_STABLE_X86.zip" -Force
           Compress-Archive "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_4_SOURCE.zip" -Force
@@ -123,7 +123,7 @@ jobs:
       - name: Upload x64
         uses: actions/upload-artifact@v4
         with:
-          name: AAII-MOOC-PC-V1.1.4-STABLE-X64
+          name: AAII-MOOC-PC-V1.1.5-WATCHDOG-X64
           path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_4_STABLE_X64.zip
           if-no-files-found: error
           retention-days: 14
@@ -131,7 +131,7 @@ jobs:
       - name: Upload x86
         uses: actions/upload-artifact@v4
         with:
-          name: AAII-MOOC-PC-V1.1.4-STABLE-X86
+          name: AAII-MOOC-PC-V1.1.5-WATCHDOG-X86
           path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_4_STABLE_X86.zip
           if-no-files-found: error
           retention-days: 14
@@ -139,7 +139,7 @@ jobs:
       - name: Upload source
         uses: actions/upload-artifact@v4
         with:
-          name: AAII-MOOC-PC-V1.1.4-SOURCE
+          name: AAII-MOOC-PC-V1.1.5-SOURCE
           path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_4_SOURCE.zip
           if-no-files-found: error
           retention-days: 14
