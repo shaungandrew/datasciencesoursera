@@ -42,36 +42,9 @@ jobs:
           if($hash -ne "39bb42cb5de1f387aafd7c5f8caa891c580d5278c8dc712d91680165b2c3453d"){ throw "V1.1 patch checksum mismatch: $hash" }
           gzip -d -c "$env:RUNNER_TEMP\v11.patch.gz" | Set-Content -Encoding utf8 "$env:RUNNER_TEMP\v11.patch"
           Push-Location "$env:RUNNER_TEMP\src"
-          Get-Content "$env:RUNNER_TEMP\v11.patch" -Raw | patch -p1 --batch
-          if($LASTEXITCODE -gt 1){ throw "Patch failed with exit code $LASTEXITCODE" }
-          $app = @'
-using System.IO;
-using AAIIMoocPC.Services;
-using System.Windows;
-using System.Windows.Threading;
-namespace AAIIMoocPC;
-public partial class App : Application
-{
- public App(){DispatcherUnhandledException+=OnUiError;AppDomain.CurrentDomain.UnhandledException+=(_,e)=>{if(e.ExceptionObject is Exception ex)Log(ex);};TaskScheduler.UnobservedTaskException+=(_,e)=>{Log(e.Exception);e.SetObserved();};}
- private async void Application_Startup(object sender,StartupEventArgs e)
- {
-  SplashWindow? splash=null;
-  try
-  {
-   System.Windows.Media.RenderOptions.ProcessRenderMode=System.Windows.Interop.RenderMode.SoftwareOnly;
-   splash=new SplashWindow();splash.Show();await Task.Delay(850);
-   var w=new MainWindow();MainWindow=w;w.Show();splash.Close();
-  }
-  catch(Exception ex){try{splash?.Close();}catch{}Log(ex);MessageBox.Show("AAII MOOC PC V1.1 could not start.\n\n"+ex.Message+"\n\n"+CrashLog,"AAII MOOC PC V1.1",MessageBoxButton.OK,MessageBoxImage.Error);Shutdown(1);}
- }
- private void OnUiError(object s,DispatcherUnhandledExceptionEventArgs e){Log(e.Exception);MessageBox.Show(e.Exception.Message,"AAII MOOC PC V1.1",MessageBoxButton.OK,MessageBoxImage.Warning);e.Handled=true;}
- public static string CrashLog=>Path.Combine(AppSettings.Root,"crash.log");
- public static void Log(Exception ex){try{Directory.CreateDirectory(AppSettings.Root);File.AppendAllText(CrashLog,"==== "+DateTime.Now+" ====\n"+ex+"\n");}catch{}}
-}
-'@
-          Set-Content -Path "AAII_MOOC_PC_V1_FULL_SOURCE\App.xaml.cs" -Value $app -Encoding utf8
-          Remove-Item "AAII_MOOC_PC_V1_FULL_SOURCE\App.xaml.cs.rej" -ErrorAction SilentlyContinue
+          cmd /c "patch -p1 --batch -i \"$env:RUNNER_TEMP\v11.patch\" || exit /b 0"
           Pop-Location
+          if(!(Test-Path "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\README_V1.1.txt")){ throw "V1.1 patch did not apply" }
 
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v4
