@@ -1,0 +1,177 @@
+name: Build AAII MOOC PC V1.1.5 Watchdog
+
+on:
+  push:
+    branches:
+      - aaii-mooc-pc-v115-watchdog
+    paths:
+      - '.github/workflows/aaii-mooc-pc-v115-watchdog.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore V1 source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference="Stop"
+          $parts=Get-ChildItem "aaii-mooc-pc-v1/source.b64.*"|Sort-Object Name
+          $b64=($parts|ForEach-Object{Get-Content $_.FullName -Raw})-join ""
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\src.zip",[Convert]::FromBase64String(($b64 -replace "\s","")))
+          Expand-Archive "$env:RUNNER_TEMP\src.zip" "$env:RUNNER_TEMP\src" -Force
+
+      - name: Apply V1.1 UI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference="Stop"
+          $parts=Get-ChildItem "aaii-mooc-pc-v11/v11.patch.gz.b64.*"|Sort-Object Name
+          $b64=($parts|ForEach-Object{Get-Content $_.FullName -Raw})-join ""
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\v11.gz",[Convert]::FromBase64String(($b64 -replace "\s","")))
+          gzip -d -c "$env:RUNNER_TEMP\v11.gz" | Set-Content -Encoding utf8 "$env:RUNNER_TEMP\v11.patch"
+          Push-Location "$env:RUNNER_TEMP\src"
+          & patch -p1 --batch -i "$env:RUNNER_TEMP\v11.patch"
+          $global:LASTEXITCODE=0
+          Pop-Location
+
+      - name: Apply V1.1.5 compatibility fixes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference="Stop"
+          $root="$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE"
+
+          Copy-Item "aaii-mooc-pc-v113\App.xaml" "$root\App.xaml" -Force
+          Copy-Item "aaii-mooc-pc-v115\App.xaml.cs" "$root\App.xaml.cs" -Force
+
+          $mw="$root\MainWindow.xaml.cs"
+          $c=Get-Content $mw -Raw
+
+          $c=$c -replace 'bool _exitConfirmed;',("bool _exitConfirmed;" + "`r`n    public bool ForceCloseForAppExit { get; set; }")
+
+          $auto='if \(!string\.IsNullOrWhiteSpace\(_settings\.Token\)\)\s*\{\s*ShowShell\(\);\s*Loaded \+= async \(_, _\) => await LoadHomeSafeAsync\(\);\s*\}'
+          $c=[regex]::Replace($c,$auto,'LoginStatus.Text = "V1.1.5 Compatibility · sign in manually.";')
+
+          $c=$c -replace 'ContentPanel\.ItemWidth = double\.NaN;\s*',''
+          $c=$c -replace 'c\.Effect=new DropShadowEffect\{BlurRadius=12,ShadowDepth=3,Opacity=\.10,Color=Colors\.SlateGray\};',''
+
+          $old='void MainWindow_Closing\(object\? sender,System\.ComponentModel\.CancelEventArgs e\)\{if\(_exitConfirmed\)\{Application\.Current\.Shutdown\(\);return;\}var r=MessageBox\.Show\("Exit AAII MOOC PC V1\.1\?","AAII MOOC PC V1\.1",MessageBoxButton\.YesNo,MessageBoxImage\.Question\);if\(r!=MessageBoxResult\.Yes\)\{e\.Cancel=true;return;\}_exitConfirmed=true;Application\.Current\.Shutdown\(\);\}'
+          $new='void MainWindow_Closing(object? sender,System.ComponentModel.CancelEventArgs e){App.LogText("MainWindow Closing requested");if(ForceCloseForAppExit){App.LogText("MainWindow close allowed for application exit");return;}var r=MessageBox.Show("Close the full MOOC window and return to the launcher?","AAII MOOC PC V1.1.5",MessageBoxButton.YesNo,MessageBoxImage.Question);if(r!=MessageBoxResult.Yes){e.Cancel=true;App.LogText("MainWindow close cancelled by user");return;}_exitConfirmed=true;App.LogText("MainWindow close confirmed; returning to launcher");}'
+          $c=[regex]::Replace($c,$old,$new)
+          Set-Content $mw $c -Encoding utf8
+
+          $mx="$root\MainWindow.xaml"
+          $x=Get-Content $mx -Raw
+          $x=[regex]::Replace($x,'<Border\.Effect>.*?</Border\.Effect>','',[Text.RegularExpressions.RegexOptions]::Singleline)
+          $x=$x -replace 'Title="AAII MOOC Learning Hub — PC V1\.1"','Title="AAII MOOC Learning Hub — PC V1.1.5 Compatibility"'
+          Set-Content $mx $x -Encoding utf8
+
+          $api="$root\Services\ApiClient.cs"
+          $a=Get-Content $api -Raw
+          if($a -notmatch "using System.Net.Http;"){Set-Content $api ("using System.Net.Http;`r`n"+$a) -Encoding utf8}
+
+          $settings="$root\Services\AppSettings.cs"
+          $a=Get-Content $settings -Raw
+          if($a -notmatch "using System.IO;"){Set-Content $settings ("using System.IO;`r`n"+$a) -Encoding utf8}
+
+          $proj="$root\AAIIMoocPC.csproj"
+          $a=Get-Content $proj -Raw
+          $a=$a -replace '<Version>1\.1\.0</Version>','<Version>1.1.5</Version>'
+          $a=$a -replace '<FileVersion>1\.1\.0\.0</FileVersion>','<FileVersion>1.1.5.0</FileVersion>'
+          $a=$a -replace '<AssemblyVersion>1\.1\.0\.0</AssemblyVersion>','<AssemblyVersion>1.1.5.0</AssemblyVersion>'
+          Set-Content $proj $a -Encoding utf8
+
+          if($c -notmatch 'ForceCloseForAppExit'){throw "MainWindow lifecycle patch failed"}
+          if($c -match 'Loaded \+= async \(_, _\) => await LoadHomeSafeAsync\(\);'){throw "Auto server load removal failed"}
+          if($x -match 'DropShadowEffect'){throw "Static DropShadowEffect removal failed"}
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore and build
+        shell: pwsh
+        working-directory: ${{ runner.temp }}\src\AAII_MOOC_PC_V1_FULL_SOURCE
+        run: |
+          dotnet restore AAIIMoocPC.csproj
+          dotnet build AAIIMoocPC.csproj -c Release --no-restore
+
+      - name: Publish x64
+        shell: pwsh
+        working-directory: ${{ runner.temp }}\src\AAII_MOOC_PC_V1_FULL_SOURCE
+        run: dotnet publish AAIIMoocPC.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o "$env:RUNNER_TEMP\x64"
+
+      - name: Publish x86
+        shell: pwsh
+        working-directory: ${{ runner.temp }}\src\AAII_MOOC_PC_V1_FULL_SOURCE
+        run: dotnet publish AAIIMoocPC.csproj -c Release -r win-x86 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o "$env:RUNNER_TEMP\x86"
+
+      - name: Add watchdog and package
+        shell: pwsh
+        run: |
+          $readme=@"
+AAII MOOC PC V1.1.5 — Compatibility + System Watchdog
+
+IMPORTANT:
+1. Extract ALL files.
+2. Double-click START_DIAGNOSTIC.cmd, not only AAII_MOOC_PC.exe.
+3. Keep the black watchdog window open.
+4. In the launcher click OPEN FULL MOOC UI.
+5. Do not press TEST SERVER until the Full UI is stable.
+6. If the program disappears, the watchdog writes:
+   Desktop\AAII_MOOC_PC_SYSTEM_DIAG.txt
+
+That file includes:
+- process exit code
+- recent Windows Application Error events
+- .NET Runtime events
+- Windows Error Reporting events
+- Windows Defender events
+- managed AAII crash log
+
+This version also:
+- keeps the launcher visible
+- disables static drop shadows
+- forces WPF software rendering
+- disables auto server/API load before manual login
+"@
+          foreach($d in @("$env:RUNNER_TEMP\x64","$env:RUNNER_TEMP\x86")){
+            Copy-Item "aaii-mooc-pc-v115\WATCHDOG.ps1" "$d\WATCHDOG.ps1" -Force
+            Copy-Item "aaii-mooc-pc-v115\START_DIAGNOSTIC.cmd" "$d\START_DIAGNOSTIC.cmd" -Force
+            Set-Content "$d\README_V1.1.5.txt" $readme -Encoding utf8
+          }
+          Compress-Archive "$env:RUNNER_TEMP\x64\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_5_WATCHDOG_X64.zip" -Force
+          Compress-Archive "$env:RUNNER_TEMP\x86\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_5_WATCHDOG_X86.zip" -Force
+          Compress-Archive "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_5_SOURCE.zip" -Force
+          Get-FileHash "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_5_WATCHDOG_X64.zip" -Algorithm SHA256
+          Get-FileHash "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_5_WATCHDOG_X86.zip" -Algorithm SHA256
+
+      - name: Upload x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: AAII-MOOC-PC-V1.1.5-WATCHDOG-X64
+          path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_5_WATCHDOG_X64.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload x86
+        uses: actions/upload-artifact@v4
+        with:
+          name: AAII-MOOC-PC-V1.1.5-WATCHDOG-X86
+          path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_5_WATCHDOG_X86.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload source
+        uses: actions/upload-artifact@v4
+        with:
+          name: AAII-MOOC-PC-V1.1.5-SOURCE
+          path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_5_SOURCE.zip
+          if-no-files-found: error
+          retention-days: 14
