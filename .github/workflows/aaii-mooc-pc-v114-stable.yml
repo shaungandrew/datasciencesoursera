@@ -107,30 +107,7 @@ void MainWindow_Closing(object? sender,System.ComponentModel.CancelEventArgs e)
           $a=$a -replace '<AssemblyVersion>1\.1\.0\.0</AssemblyVersion>','<AssemblyVersion>1.1.4.0</AssemblyVersion>'
           Set-Content $proj $a -Encoding utf8
 
-          @'
-AAII MOOC PC V1.1.4 — Stable Lifecycle Fix
-
-Fixes:
-- Server is NOT contacted when Full MOOC UI first opens.
-- Stored login token is NOT auto-used at startup.
-- Closing the Full MOOC UI no longer shuts down the whole application.
-- Launcher is hidden only after the Full UI loads.
-- If Full UI closes, the launcher comes back automatically.
-- Main window Loaded / Activated / Deactivated / Closing / Closed lifecycle is logged.
-- Crash/lifecycle log is also copied to Desktop:
-  AAII_MOOC_PC_CRASH.txt
-- Heavy card drop shadows are disabled for startup stability.
-
-Use:
-1. Extract the whole ZIP.
-2. Run AAII_MOOC_PC.exe from inside the extracted folder.
-3. Click OPEN FULL MOOC UI.
-4. Sign in manually.
-5. Use TEST SERVER API only when you want to test the server.
-
-Server:
-https://aaii.asia/edu/mooc/api/
-'@ | Set-Content "$root\README_V1.1.4.txt" -Encoding utf8
+          Set-Content "$root\\README_V1.1.4.txt" -Value "AAII MOOC PC V1.1.4 — Stable Lifecycle Fix`r`n`r`nServer is not contacted when Full MOOC UI first opens.`r`nClosing Full MOOC UI returns to the launcher instead of shutting down the whole app.`r`nLifecycle and crash logs are copied to Desktop as AAII_MOOC_PC_CRASH.txt.`r`n`r`nExtract the whole ZIP, run AAII_MOOC_PC.exe, click OPEN FULL MOOC UI, then sign in manually." -Encoding utf8
 
           if($c -notmatch 'ForceCloseForAppExit'){throw "MainWindow property patch failed"}
           if($c -notmatch 'returning to launcher'){throw "MainWindow closing patch failed"}
