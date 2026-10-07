@@ -3,11 +3,16 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <application
         android:allowBackup="false"
-        android:label="YCTA Taxi Digital Member"
+        android:label="YCTA Taxi Digital Member + Library"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <activity android:name=".EpubReaderActivity" android:exported="false" />
+        <activity android:name=".PdfReaderActivity" android:exported="false" />
+        <activity android:name=".BookDetailActivity" android:exported="false" />
+        <activity android:name=".LibraryActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

@@ -4,6 +4,7 @@ import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
@@ -156,6 +157,16 @@ class MainActivity : ComponentActivity() {
             actions.addView(scanBtn, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(5) })
             searchCard.addView(actions)
             addView(searchCard)
+
+            addView(Button(this@MainActivity).apply {
+                text = "LIBRARY • Native eLibrary"
+                isAllCaps = false
+                setTextColor(Color.WHITE)
+                backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#5747A6"))
+                setOnClickListener {
+                    startActivity(Intent(this@MainActivity, LibraryActivity::class.java))
+                }
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
 
             progress = ProgressBar(this@MainActivity).apply { visibility = View.GONE }
             addView(progress, LinearLayout.LayoutParams(-2, -2).apply {
