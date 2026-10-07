@@ -61,8 +61,14 @@ class LibraryActivity : ComponentActivity() {
         root.addView(content)
 
         setContentView(ScrollView(this).apply { isFillViewport = true; addView(root) })
-        loginPanel.visibility = if (api.hasToken()) View.GONE else View.VISIBLE
-        loadBooks("")
+        if (api.hasToken()) {
+            loginPanel.visibility = View.GONE
+            loadBooks("")
+        } else {
+            loginPanel.visibility = View.VISIBLE
+            status.text = "Library Login / Activation Code required."
+            empty("Enter Activation Code OR Username + Password, then tap LOGIN / ACTIVATE.")
+        }
     }
 
     private fun header(): View = LinearLayout(this).apply {
@@ -102,7 +108,7 @@ class LibraryActivity : ComponentActivity() {
                 listOf("Myanmar Library", "English Library"))
             onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
                 override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
-                    if (::content.isInitialized) loadBooks(search.text.toString())
+                    if (::content.isInitialized && api.hasToken()) loadBooks(search.text.toString())
                 }
                 override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
             }
@@ -187,6 +193,13 @@ class LibraryActivity : ComponentActivity() {
 
     private fun loadBooks(query: String, categoryId: String = "", authorId: String = "") {
         if (!::content.isInitialized) return
+        if (!api.hasToken()) {
+            loginPanel.visibility = View.VISIBLE
+            content.removeAllViews()
+            status.text = "Library Login / Activation Code required."
+            empty("Enter Activation Code OR Username + Password first.")
+            return
+        }
         content.removeAllViews()
         status.text = "Loading native books…"
         lifecycleScope.launch {
@@ -199,6 +212,13 @@ class LibraryActivity : ComponentActivity() {
     }
 
     private fun loadCategories() {
+        if (!api.hasToken()) {
+            loginPanel.visibility = View.VISIBLE
+            content.removeAllViews()
+            status.text = "Library Login / Activation Code required."
+            empty("Login first to load categories.")
+            return
+        }
         content.removeAllViews(); status.text = "Loading categories…"
         lifecycleScope.launch {
             val r = withContext(Dispatchers.IO) { runCatching { api.fetchCategories(libraryCode) } }
@@ -212,6 +232,13 @@ class LibraryActivity : ComponentActivity() {
     }
 
     private fun loadAuthors() {
+        if (!api.hasToken()) {
+            loginPanel.visibility = View.VISIBLE
+            content.removeAllViews()
+            status.text = "Library Login / Activation Code required."
+            empty("Login first to load writers.")
+            return
+        }
         content.removeAllViews(); status.text = "Loading writers…"
         lifecycleScope.launch {
             val r = withContext(Dispatchers.IO) { runCatching { api.fetchAuthors(libraryCode) } }
@@ -225,6 +252,13 @@ class LibraryActivity : ComponentActivity() {
     }
 
     private fun loadAudio() {
+        if (!api.hasToken()) {
+            loginPanel.visibility = View.VISIBLE
+            content.removeAllViews()
+            status.text = "Library Login / Activation Code required."
+            empty("Login first to load audio books.")
+            return
+        }
         content.removeAllViews(); status.text = "Loading audio books…"
         lifecycleScope.launch {
             val r = withContext(Dispatchers.IO) { runCatching { api.fetchAudio(libraryCode) } }
