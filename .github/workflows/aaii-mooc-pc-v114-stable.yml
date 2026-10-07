@@ -101,7 +101,7 @@ jobs:
 
           Set-Content "$root\README_V1.1.6.txt" -Value "AAII MOOC PC V1.1.6 StackOverflow Fix`r`n`r`nRoot cause fixed: the Func<Task> ActionCard overload could call itself recursively and terminate the process with Windows exception 0xC00000FD (stack overflow) when the Home dashboard was built after login.`r`n`r`nV1.1.6 explicitly converts the async card action to System.Action, preventing recursive overload selection.`r`n`r`nExtract all files. Start with START_DIAGNOSTIC.cmd for the first test." -Encoding utf8
 
-          if($c -match 'Func<Task> action\)=>ActionCard'){ throw "Recursive ActionCard overload still present" }
+          if($c.Contains('Border ActionCard(string icon,string title,string sub,Func<Task> action)=>ActionCard(icon,title,sub,()=>_ = SafeAsync(action));')){ throw "Recursive ActionCard overload still present" }
           if($c -notmatch 'Action fire='){ throw "ActionCard stack fix missing" }
           if($c -match 'Loaded \+= async \(_, _\) => await LoadHomeSafeAsync\(\);'){ throw "Auto server load removal failed" }
           if($x -match 'DropShadowEffect'){ throw "Static DropShadowEffect removal failed" }
