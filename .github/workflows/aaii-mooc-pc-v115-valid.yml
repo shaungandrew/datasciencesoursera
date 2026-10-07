@@ -5,7 +5,7 @@ on:
     branches:
       - aaii-mooc-pc-v115-watchdog
     paths:
-      - '.github/workflows/aaii-mooc-pc-v115-watchdog.yml'
+      - '.github/workflows/aaii-mooc-pc-v115-valid.yml'
   workflow_dispatch:
 
 permissions:
