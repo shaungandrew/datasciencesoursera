@@ -7,12 +7,11 @@ data class Member(
     val joinedDate: String = "",
     val vehicleNo: String = "",
     val cityNo: String = "",
-    val phone: String = "",
-    val nrc: String = "",
-    val address: String = "",
     val district: String = "",
     val photoUrl: String = "",
-    val cvUrl: String = "",
+    val maskedPhone: String = "",
+    val maskedNrc: String = "",
+    val maskedAddress: String = "",
     val profileUrl: String
 )
 
