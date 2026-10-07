@@ -1,0 +1,76 @@
+name: Build AAII MOOC PC V1
+
+on:
+  push:
+    branches:
+      - aaii-mooc-pc-v1-build
+    paths:
+      - '.github/workflows/aaii-mooc-pc-v1-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore source ZIP
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $parts = Get-ChildItem "aaii-mooc-pc-v1/source.b64.*" | Sort-Object Name
+          $b64 = ($parts | ForEach-Object { Get-Content $_.FullName -Raw }) -join ""
+          $bytes = [Convert]::FromBase64String(($b64 -replace "\\s",""))
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\AAII_MOOC_PC_V1_FULL_SOURCE.zip",$bytes)
+          $hash=(Get-FileHash "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_FULL_SOURCE.zip" -Algorithm SHA256).Hash.ToLower()
+          if($hash -ne "d2cba38223c58d2b2b73cd19ff5378794accd8a7459956e9e26c4d3447e413a3"){ throw "Source ZIP checksum mismatch: $hash" }
+          Expand-Archive "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_FULL_SOURCE.zip" "$env:RUNNER_TEMP\src" -Force
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        shell: pwsh
+        working-directory: ${{ runner.temp }}\src\AAII_MOOC_PC_V1_FULL_SOURCE
+        run: dotnet restore AAIIMoocPC.csproj
+
+      - name: Build
+        shell: pwsh
+        working-directory: ${{ runner.temp }}\src\AAII_MOOC_PC_V1_FULL_SOURCE
+        run: dotnet build AAIIMoocPC.csproj -c Release --no-restore
+
+      - name: Publish Windows x64 portable
+        shell: pwsh
+        working-directory: ${{ runner.temp }}\src\AAII_MOOC_PC_V1_FULL_SOURCE
+        run: dotnet publish AAIIMoocPC.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o "$env:RUNNER_TEMP\publish"
+
+      - name: Package portable build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference="Stop"
+          Copy-Item "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\README_V1.0.txt" "$env:RUNNER_TEMP\publish\README_V1.0.txt" -Force
+          Compress-Archive "$env:RUNNER_TEMP\publish\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_PORTABLE.zip" -Force
+          Get-FileHash "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_PORTABLE.zip" -Algorithm SHA256
+          Get-ChildItem "$env:RUNNER_TEMP\publish" | Select Name,Length
+
+      - name: Upload portable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: AAII-MOOC-PC-V1-PORTABLE
+          path: ${{ runner.temp }}\AAII_MOOC_PC_V1_PORTABLE.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: AAII-MOOC-PC-V1-EXE
+          path: ${{ runner.temp }}\publish\AAII_MOOC_PC.exe
+          if-no-files-found: error
+          retention-days: 14
