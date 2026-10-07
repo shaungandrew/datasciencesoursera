@@ -1,0 +1,117 @@
+name: Build AAII MOOC PC V1.1.3 Diagnostic
+
+on:
+  push:
+    branches:
+      - aaii-mooc-pc-v113-diagnostic-launcher
+    paths:
+      - '.github/workflows/aaii-mooc-pc-v113-diagnostic.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore V1 source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference="Stop"
+          $parts=Get-ChildItem "aaii-mooc-pc-v1/source.b64.*"|Sort-Object Name
+          $b64=($parts|ForEach-Object{Get-Content $_.FullName -Raw})-join ""
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\src.zip",[Convert]::FromBase64String(($b64 -replace "\s","")))
+          Expand-Archive "$env:RUNNER_TEMP\src.zip" "$env:RUNNER_TEMP\src" -Force
+
+      - name: Apply V1.1 UI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference="Stop"
+          $parts=Get-ChildItem "aaii-mooc-pc-v11/v11.patch.gz.b64.*"|Sort-Object Name
+          $b64=($parts|ForEach-Object{Get-Content $_.FullName -Raw})-join ""
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\v11.gz",[Convert]::FromBase64String(($b64 -replace "\s","")))
+          gzip -d -c "$env:RUNNER_TEMP\v11.gz" | Set-Content -Encoding utf8 "$env:RUNNER_TEMP\v11.patch"
+          Push-Location "$env:RUNNER_TEMP\src"
+          & patch -p1 --batch -i "$env:RUNNER_TEMP\v11.patch"
+          $global:LASTEXITCODE=0
+          Pop-Location
+
+      - name: Apply V1.1.3 diagnostic launcher
+        shell: pwsh
+        run: |
+          $root="$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE"
+          Copy-Item "aaii-mooc-pc-v113\App.xaml" "$root\App.xaml" -Force
+          Copy-Item "aaii-mooc-pc-v113\App.xaml.cs" "$root\App.xaml.cs" -Force
+
+          $api="$root\Services\ApiClient.cs"
+          $c=Get-Content $api -Raw
+          if($c -notmatch "using System.Net.Http;"){Set-Content $api ("using System.Net.Http;`r`n"+$c) -Encoding utf8}
+          $settings="$root\Services\AppSettings.cs"
+          $c=Get-Content $settings -Raw
+          if($c -notmatch "using System.IO;"){Set-Content $settings ("using System.IO;`r`n"+$c) -Encoding utf8}
+
+          $proj="$root\AAIIMoocPC.csproj"
+          $c=Get-Content $proj -Raw
+          $c=$c -replace '<Version>1\.1\.0</Version>','<Version>1.1.3</Version>'
+          $c=$c -replace '<FileVersion>1\.1\.0\.0</FileVersion>','<FileVersion>1.1.3.0</FileVersion>'
+          $c=$c -replace '<AssemblyVersion>1\.1\.0\.0</AssemblyVersion>','<AssemblyVersion>1.1.3.0</AssemblyVersion>'
+          Set-Content $proj $c -Encoding utf8
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore and build
+        shell: pwsh
+        working-directory: ${{ runner.temp }}\src\AAII_MOOC_PC_V1_FULL_SOURCE
+        run: |
+          dotnet restore AAIIMoocPC.csproj
+          dotnet build AAIIMoocPC.csproj -c Release --no-restore
+
+      - name: Publish x64
+        shell: pwsh
+        working-directory: ${{ runner.temp }}\src\AAII_MOOC_PC_V1_FULL_SOURCE
+        run: dotnet publish AAIIMoocPC.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o "$env:RUNNER_TEMP\x64"
+
+      - name: Publish x86
+        shell: pwsh
+        working-directory: ${{ runner.temp }}\src\AAII_MOOC_PC_V1_FULL_SOURCE
+        run: dotnet publish AAIIMoocPC.csproj -c Release -r win-x86 --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o "$env:RUNNER_TEMP\x86"
+
+      - name: Package
+        shell: pwsh
+        run: |
+          "Extract ALL files, then run AAII_MOOC_PC.exe. Use OPEN FULL MOOC UI first. If it fails, send AAII_MOOC_PC_CRASH.txt from Desktop." | Set-Content "$env:RUNNER_TEMP\x64\RUN_README.txt"
+          Copy-Item "$env:RUNNER_TEMP\x64\RUN_README.txt" "$env:RUNNER_TEMP\x86\RUN_README.txt" -Force
+          Compress-Archive "$env:RUNNER_TEMP\x64\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_3_DIAGNOSTIC_X64.zip" -Force
+          Compress-Archive "$env:RUNNER_TEMP\x86\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_3_DIAGNOSTIC_X86.zip" -Force
+          Compress-Archive "$env:RUNNER_TEMP\src\AAII_MOOC_PC_V1_FULL_SOURCE\*" "$env:RUNNER_TEMP\AAII_MOOC_PC_V1_1_3_SOURCE.zip" -Force
+
+      - name: Upload x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: AAII-MOOC-PC-V1.1.3-DIAGNOSTIC-X64
+          path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_3_DIAGNOSTIC_X64.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload x86
+        uses: actions/upload-artifact@v4
+        with:
+          name: AAII-MOOC-PC-V1.1.3-DIAGNOSTIC-X86
+          path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_3_DIAGNOSTIC_X86.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload source
+        uses: actions/upload-artifact@v4
+        with:
+          name: AAII-MOOC-PC-V1.1.3-SOURCE
+          path: ${{ runner.temp }}\AAII_MOOC_PC_V1_1_3_SOURCE.zip
+          if-no-files-found: error
+          retention-days: 14
