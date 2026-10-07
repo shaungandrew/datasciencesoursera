@@ -74,3 +74,5 @@ jobs:
           path: ${{ runner.temp }}\publish\AAII_MOOC_PC.exe
           if-no-files-found: error
           retention-days: 14
+
+# source-repaired
