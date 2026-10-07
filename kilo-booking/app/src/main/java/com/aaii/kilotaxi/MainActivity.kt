@@ -276,7 +276,7 @@ class MainActivity : ComponentActivity() {
                     text=label;isAllCaps=false
                     setOnClickListener {
                         if(needsKm){
-                            promptDecimal(if(endKm)"End odometer KM":"Start odometer KM") { km ->
+                            promptDecimal(if (endKm) "End odometer KM" else "Start odometer KM") { km ->
                                 val d=JSONObject().put("booking_id",id).put("status",to).put(if(endKm)"end_km" else "start_km",km)
                                 netToast { api.post("driver_action",d,token) }
                             }
