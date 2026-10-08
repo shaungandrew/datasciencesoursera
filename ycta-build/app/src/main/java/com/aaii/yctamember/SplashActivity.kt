@@ -59,7 +59,7 @@ class SplashActivity : ComponentActivity() {
         }, LinearLayout.LayoutParams(-1, -2))
 
         root.addView(TextView(this).apply {
-            text = "YCTA TAXI • Digital Member System"
+            text = "YCTA TAXI • AAII Digital Member System"
             gravity = Gravity.CENTER
             textSize = 14f
             setTextColor(Color.parseColor("#C7E7F8"))
