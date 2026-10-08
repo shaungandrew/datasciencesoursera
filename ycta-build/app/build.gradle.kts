@@ -6,11 +6,11 @@ android {
     namespace = "com.aaii.yctamember"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.aaii.yctamember"
+        applicationId = "asia.aaii.yctataxi"
         minSdk = 24
         targetSdk = 35
-        versionCode = 19
-        versionName = "7.1.0"
+        versionCode = 1
+        versionName = "7.2.0"
     }
     buildTypes { release { isMinifyEnabled = false } }
     compileOptions {
