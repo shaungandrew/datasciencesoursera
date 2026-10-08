@@ -18,6 +18,10 @@ import android.view.inputmethod.EditorInfo
 import android.widget.*
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import android.net.Uri
 import com.google.zxing.BarcodeFormat
 import com.journeyapps.barcodescanner.BarcodeEncoder
 import com.journeyapps.barcodescanner.ScanContract
@@ -38,6 +42,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var status: TextView
     private lateinit var progress: ProgressBar
     private lateinit var results: LinearLayout
+    private lateinit var liveCount: TextView
+    private val mobileApi = YctaMobileApi()
     private lateinit var repository: YctaRepository
 
     private var currentMember: Member? = null
@@ -54,6 +60,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         repository = YctaRepository(cacheDir)
 
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = Color.parseColor("#082F55")
         window.navigationBarColor = Color.WHITE
 
@@ -76,6 +83,15 @@ class MainActivity : ComponentActivity() {
             isFillViewport = true
             addView(root)
         })
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val top = insets.getInsets(WindowInsetsCompat.Type.statusBars())
+            val bottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            view.setPadding(dp(14) + top.left, dp(14) + top.top,
+                dp(14) + top.right, dp(28) + bottom.bottom)
+            insets
+        }
+        ViewCompat.requestApplyInsets(root)
+        refreshHomeCounts()
 
         val apiMemberId = intent?.getLongExtra("mobile_api_member_id", -1L) ?: -1L
         if (apiMemberId > 0L) {
@@ -103,7 +119,12 @@ class MainActivity : ComponentActivity() {
             val header = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, dp(2), 0, dp(8))
+                setPadding(dp(14), dp(18), dp(14), dp(18))
+                background = GradientDrawable(
+                    GradientDrawable.Orientation.TL_BR,
+                    intArrayOf(Color.parseColor("#0B3658"), Color.parseColor("#116D95"))
+                ).apply { cornerRadius = dp(22).toFloat() }
+                elevation = dp(4).toFloat()
             }
             header.addView(yctaLogo(76), LinearLayout.LayoutParams(dp(76), dp(76)).apply {
                 marginEnd = dp(10)
@@ -115,17 +136,25 @@ class MainActivity : ComponentActivity() {
                 text = "YANGON CITY TAXI ASSOCIATION"
                 textSize = 12f
                 letterSpacing = 0.04f
-                setTextColor(Color.parseColor("#1478B8"))
+                setTextColor(Color.parseColor("#B7E8FF"))
                 setTypeface(typeface, Typeface.BOLD)
             })
             headerTitles.addView(TextView(this@MainActivity).apply {
-                text = "Digital Member Card"
+                text = "YCTA • Member Hub"
                 textSize = 26f
-                setTextColor(Color.parseColor("#123A63"))
+                setTextColor(Color.WHITE)
                 setTypeface(typeface, Typeface.BOLD)
             })
             header.addView(headerTitles, LinearLayout.LayoutParams(0, -2, 1f))
             addView(header)
+
+            liveCount = TextView(this@MainActivity).apply {
+                text = "Connecting to YCTA SQL member directory…"
+                textSize = 12.5f
+                setTextColor(Color.parseColor("#4C6980"))
+                setPadding(dp(3), dp(13), dp(3), dp(9))
+            }
+            addView(liveCount)
 
             addView(TextView(this@MainActivity).apply {
                 text = "Search member or scan QR to open the native smart card."
@@ -188,36 +217,52 @@ class MainActivity : ComponentActivity() {
             searchCard.addView(actions)
             addView(searchCard)
 
-            addView(Button(this@MainActivity).apply {
-                text = "14 Districts • 44 Townships • Members"
-                isAllCaps = false
-                setTextColor(Color.WHITE)
-                backgroundTintList = android.content.res.ColorStateList.valueOf(
-                    Color.parseColor("#1567A9"))
-                setOnClickListener {
-                    startActivity(Intent(this@MainActivity, TownshipMembersActivity::class.java))
-                }
-            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
+            addView(TextView(this@MainActivity).apply {
+                text = "QUICK ACCESS"
+                textSize = 12f
+                letterSpacing = 0.1f
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(Color.parseColor("#70879C"))
+                setPadding(dp(3), dp(19), 0, dp(10))
+            })
 
-            addView(Button(this@MainActivity).apply {
-                text = "LIBRARY • Native eLibrary"
-                isAllCaps = false
-                setTextColor(Color.WHITE)
-                backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#5747A6"))
-                setOnClickListener {
+            val first = dashboardRow(
+                dashboardCard("📍", "Districts & Townships",
+                    "14 ခရိုင် • 44 မြို့နယ်", "#155C9C") {
+                    startActivity(Intent(this@MainActivity, TownshipMembersActivity::class.java))
+                },
+                dashboardCard("🔎", "Search Member",
+                    "SQL Member ID / Name", "#007B7F") {
+                    input.requestFocus()
+                    status.text = "Enter a member ID or name above to search YCTA database."
+                }
+            )
+            addView(first)
+            addView(dashboardRow(
+                dashboardCard("▣", "QR Scanner",
+                    "Scan YCTA Member Card", "#138167") { scanBtn.performClick() },
+                dashboardCard("📚", "eLibrary",
+                    "PDF • EPUB • Reader", "#6755A7") {
                     startActivity(Intent(this@MainActivity, LibraryActivity::class.java))
                 }
-            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
-
-            addView(Button(this@MainActivity).apply {
-                text = "MOOC • Native Learning Hub"
-                isAllCaps = false
-                setTextColor(Color.WHITE)
-                backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#0B7C68"))
-                setOnClickListener {
+            ))
+            addView(dashboardRow(
+                dashboardCard("🎓", "MOOC Courses",
+                    "Learning • Video Player", "#C58616") {
                     startActivity(Intent(this@MainActivity, MoocActivity::class.java))
+                },
+                dashboardCard("🌐", "YCTA Website",
+                    "ycta.aaii.asia", "#485A88") {
+                    startActivity(Intent(Intent.ACTION_VIEW,
+                        Uri.parse("https://ycta.aaii.asia/")))
                 }
-            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+            ))
+            addView(TextView(this@MainActivity).apply {
+                text = "All member search and district counts come from the YCTA SQL Mobile API."
+                textSize = 12f
+                setTextColor(Color.parseColor("#72859B"))
+                setPadding(dp(3), dp(10), dp(3), dp(8))
+            })
 
             progress = ProgressBar(this@MainActivity).apply { visibility = View.GONE }
             addView(progress, LinearLayout.LayoutParams(-2, -2).apply {
@@ -235,6 +280,65 @@ class MainActivity : ComponentActivity() {
 
             results = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL }
             addView(results)
+        }
+    }
+
+    private fun dashboardRow(left: View, right: View): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(left, LinearLayout.LayoutParams(0, dp(126), 1f).apply {
+                marginEnd = dp(6)
+            })
+            addView(right, LinearLayout.LayoutParams(0, dp(126), 1f).apply {
+                marginStart = dp(6)
+            })
+        }
+
+    private fun dashboardCard(iconText: String, name: String, caption: String,
+                              accent: String, action: () -> Unit): View =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(13), dp(11), dp(8), dp(11))
+            background = rounded(Color.WHITE, 18, "#DAE5EF", 1)
+            elevation = dp(3).toFloat()
+            setOnClickListener { action() }
+            isClickable = true
+            isFocusable = true
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(12)
+            }
+            addView(TextView(this@MainActivity).apply {
+                text = iconText
+                textSize = 22f
+                setTextColor(Color.parseColor(accent))
+            })
+            addView(TextView(this@MainActivity).apply {
+                text = name
+                textSize = 15f
+                maxLines = 2
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(Color.parseColor("#193A59"))
+                setPadding(0, dp(4), 0, dp(2))
+            })
+            addView(TextView(this@MainActivity).apply {
+                text = caption
+                textSize = 11f
+                maxLines = 2
+                setTextColor(Color.parseColor("#647C92"))
+            })
+        }
+
+    private fun refreshHomeCounts() {
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) { runCatching { mobileApi.districts() } }
+            result.onSuccess { list ->
+                val mapped = list.sumOf { it.count }
+                val assigned = list.sumOf { (it.count - it.unassigned).coerceAtLeast(0) }
+                liveCount.text = "$mapped district-linked members   •   $assigned township-assigned   •   14 districts"
+            }.onFailure {
+                liveCount.text = "Mobile API unavailable • Install YCTA API V1.5 and run SQL Sync"
+            }
         }
     }
 
