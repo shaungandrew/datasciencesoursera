@@ -6,7 +6,7 @@
 
     <application
         android:allowBackup="false"
-        android:label="YCTA Taxi Association"
+        android:label="YCTA Taxi AAII"
         android:icon="@drawable/ycta_logo"
         android:roundIcon="@drawable/ycta_logo"
         android:supportsRtl="true"
