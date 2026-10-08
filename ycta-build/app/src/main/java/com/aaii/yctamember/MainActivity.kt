@@ -86,20 +86,32 @@ class MainActivity : ComponentActivity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
 
-            addView(TextView(this@MainActivity).apply {
-                text = "YCTA TAXI"
-                textSize = 13f
-                letterSpacing = 0.12f
+            val header = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, dp(2), 0, dp(8))
+            }
+            header.addView(yctaLogo(76), LinearLayout.LayoutParams(dp(76), dp(76)).apply {
+                marginEnd = dp(10)
+            })
+            val headerTitles = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+            }
+            headerTitles.addView(TextView(this@MainActivity).apply {
+                text = "YANGON CITY TAXI ASSOCIATION"
+                textSize = 12f
+                letterSpacing = 0.04f
                 setTextColor(Color.parseColor("#1478B8"))
                 setTypeface(typeface, Typeface.BOLD)
             })
-
-            addView(TextView(this@MainActivity).apply {
+            headerTitles.addView(TextView(this@MainActivity).apply {
                 text = "Digital Member Card"
-                textSize = 30f
+                textSize = 26f
                 setTextColor(Color.parseColor("#123A63"))
                 setTypeface(typeface, Typeface.BOLD)
             })
+            header.addView(headerTitles, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(header)
 
             addView(TextView(this@MainActivity).apply {
                 text = "Search member or scan QR to open the native smart card."
@@ -340,6 +352,10 @@ class MainActivity : ComponentActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
+
+        titleRow.addView(yctaLogo(66), LinearLayout.LayoutParams(dp(66), dp(66)).apply {
+            marginEnd = dp(9)
+        })
 
         val brand = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -647,6 +663,16 @@ class MainActivity : ComponentActivity() {
             if (strokeDp > 0) setStroke(dp(strokeDp), Color.parseColor(strokeHex))
         }
     }
+
+    private fun yctaLogo(sizeDp: Int): ImageView =
+        ImageView(this).apply {
+            setImageResource(R.drawable.ycta_logo)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "Yangon City Taxi Association logo"
+            adjustViewBounds = false
+            minimumWidth = dp(sizeDp)
+            minimumHeight = dp(sizeDp)
+        }
 
     private fun smartCardGradient(): GradientDrawable {
         return GradientDrawable(
