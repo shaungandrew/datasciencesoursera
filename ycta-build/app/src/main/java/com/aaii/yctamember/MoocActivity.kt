@@ -32,6 +32,9 @@ class MoocActivity : ComponentActivity() {
     private lateinit var bottomBar: LinearLayout
     private lateinit var searchInput: EditText
     private var activeSource = "home"
+    private var loginOpen = false
+    private var pendingSource: String? = null
+    private var pendingSearch = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -231,6 +234,16 @@ class MoocActivity : ComponentActivity() {
 
         content.addView(infoCard())
 
+        if (!api.hasToken()) {
+            status.text = "MOOC • Login / Activation required"
+            content.addView(Button(this).apply {
+                text = "Login / Activate to load MOOC courses"
+                isAllCaps = false
+                setOnClickListener { showLogin() }
+            })
+            return
+        }
+
         lifecycleScope.launch {
             val counts = withContext(Dispatchers.IO) {
                 listOf("mooc", "youtube", "drive", "freehub").associateWith {
@@ -312,6 +325,12 @@ class MoocActivity : ComponentActivity() {
         }
 
     private fun showSource(source: String) {
+        if (!api.hasToken()) {
+            pendingSource = source
+            status.text = "Sign in to view ${sourceTitle(source)} courses."
+            showLogin()
+            return
+        }
         activeSource = source
         content.removeAllViews()
         content.addView(sectionHeader(sourceTitle(source), "Native Categories"))
@@ -472,6 +491,12 @@ class MoocActivity : ComponentActivity() {
     }
 
     private fun runSearch(query: String) {
+        if (!api.hasToken()) {
+            pendingSource = "search"
+            pendingSearch = query
+            showLogin()
+            return
+        }
         val q = query.trim()
         if (q.isBlank()) {
             Toast.makeText(this, "Enter a search keyword.", Toast.LENGTH_SHORT).show()
@@ -495,6 +520,11 @@ class MoocActivity : ComponentActivity() {
     }
 
     private fun syncActive() {
+        if (!api.hasToken()) {
+            pendingSource = activeSource
+            showLogin()
+            return
+        }
         val source = activeSource.takeIf { it in listOf("mooc", "youtube", "drive", "freehub") }
         if (source == null) {
             syncAll()
@@ -514,6 +544,11 @@ class MoocActivity : ComponentActivity() {
     }
 
     private fun syncAll() {
+        if (!api.hasToken()) {
+            pendingSource = "home"
+            showLogin()
+            return
+        }
         lifecycleScope.launch {
             status.text = "Syncing MOOC, YouTube, Drive and Free Hub…"
             val result = withContext(Dispatchers.IO) {
