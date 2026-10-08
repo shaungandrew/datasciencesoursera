@@ -9,8 +9,8 @@ android {
         applicationId = "asia.aaii.yctataxi"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "7.2.0"
+        versionCode = 2
+        versionName = "7.3.0"
     }
     buildTypes { release { isMinifyEnabled = false } }
     compileOptions {
