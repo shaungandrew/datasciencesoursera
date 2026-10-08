@@ -30,6 +30,8 @@ class MoocCourseDetailActivity : ComponentActivity() {
     private lateinit var sourceView: TextView
     private lateinit var statusView: TextView
     private lateinit var bottomBar: LinearLayout
+    private lateinit var openButton: Button
+    private var lookingForLink = false
     private lateinit var current: MoocApi.Course
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -159,11 +161,14 @@ class MoocCourseDetailActivity : ComponentActivity() {
             setBackgroundColor(Color.WHITE)
             elevation = dp(10).toFloat()
 
-            addView(Button(this@MoocCourseDetailActivity).apply {
+            openButton = Button(this@MoocCourseDetailActivity).apply {
                 text = openButtonText(current.sourceType)
                 isAllCaps = false
                 setOnClickListener { openCourse() }
-            }, LinearLayout.LayoutParams(0, -2, 1.4f).apply { marginEnd = dp(4) })
+            }
+            addView(openButton, LinearLayout.LayoutParams(0, -2, 1.4f).apply {
+                marginEnd = dp(4)
+            })
 
             addView(Button(this@MoocCourseDetailActivity).apply {
                 text = "Certificate"
@@ -214,15 +219,71 @@ class MoocCourseDetailActivity : ComponentActivity() {
     }
 
     private fun openCourse() {
-        val url = current.url
-        if (url.isBlank()) {
-            Toast.makeText(this, "Course enrollment/source link is not available yet.", Toast.LENGTH_LONG).show()
+        if (lookingForLink) return
+
+        val currentUrl = safeHttpUrl(current.url)
+        if (currentUrl != null) {
+            launchCourseUrl(currentUrl)
             return
         }
+
+        // Some legacy source records contain only a course ID. Never show
+        // "source link unavailable" without checking the source API first.
+        lookingForLink = true
+        openButton.isEnabled = false
+        openButton.text = "Finding video…"
+        statusView.text = "Checking lesson/video source link…"
+        lifecycleScope.launch {
+            val updated = withContext(Dispatchers.IO) {
+                runCatching { api.detail(current) }
+            }
+            lookingForLink = false
+            openButton.isEnabled = true
+            openButton.text = openButtonText(current.sourceType)
+
+            updated.onSuccess { latest ->
+                current = latest
+                render(latest)
+                val url = safeHttpUrl(latest.url)
+                if (url != null) {
+                    statusView.text = "Source found."
+                    launchCourseUrl(url)
+                } else {
+                    showLinkMissing()
+                }
+            }.onFailure {
+                statusView.text = "Unable to check video source: ${it.message}"
+                showLinkMissing()
+            }
+        }
+    }
+
+    private fun showLinkMissing() {
+        val explanation = "No playable YouTube/Drive/provider URL was returned for this course." +
+            "\n\nCourse ID: ${current.id.ifBlank { "Not provided" }}" +
+            "\nSource: ${sourceLabel(current.sourceType)}" +
+            "\n\nPlease check the source/video link in MOOC Admin."
+        statusView.text = "This course has no video/source URL in its available data."
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Video source missing")
+            .setMessage(explanation)
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
+    private fun safeHttpUrl(raw: String): String? {
+        val url = raw.trim().replace("&amp;", "&")
+        val parsed = runCatching { java.net.URI(url) }.getOrNull() ?: return null
+        if (parsed.scheme?.lowercase() !in listOf("http", "https") ||
+            parsed.host.isNullOrBlank()) return null
+        return url
+    }
+
+    private fun launchCourseUrl(url: String) {
         runCatching {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         }.onFailure {
-            Toast.makeText(this, "Unable to open course source.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Unable to open video link: ${it.message}", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -261,8 +322,8 @@ class MoocCourseDetailActivity : ComponentActivity() {
 
     private fun openButtonText(source: String): String =
         when (source.lowercase()) {
-            "youtube" -> "Open YouTube"
-            "drive" -> "Open Drive"
+            "youtube" -> "Open Video"
+            "drive" -> "Open Video"
             "freehub" -> "Open Free Hub"
             else -> "Join / Open Course"
         }
