@@ -603,7 +603,7 @@ class MainActivity : ComponentActivity() {
         }
         chipRow.addView(buildChip(), LinearLayout.LayoutParams(dp(50), dp(38)))
         chipRow.addView(TextView(this).apply {
-            text = "Official profile source • session protected"
+            text = "Verified source • ycta.aaii.asia"
             textSize = 11f
             setTextColor(Color.parseColor("#C8E7F7"))
             setPadding(dp(10), 0, 0, 0)
@@ -689,6 +689,9 @@ class MainActivity : ComponentActivity() {
         addSmartRow(dataPanel, "Joined Date", display(m.joinedDate))
         addSmartRow(dataPanel, "Vehicle No", display(m.vehicleNo))
         addSmartRow(dataPanel, "City No", display(m.cityNo))
+        if (m.membershipStatus.isNotBlank()) {
+            addSmartRow(dataPanel, "Member Status", m.membershipStatus.uppercase())
+        }
         addSmartRow(dataPanel, "District / Township", display(m.district))
         card.addView(dataPanel)
 
@@ -713,7 +716,7 @@ class MainActivity : ComponentActivity() {
         card.addView(privateBlock)
 
         card.addView(Button(this).apply {
-            text = "Show private information"
+            text = "Private information — access rules"
             isAllCaps = false
             setTextColor(Color.parseColor("#123A63"))
             backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#E6F3FA"))
@@ -748,7 +751,7 @@ class MainActivity : ComponentActivity() {
             setTextColor(Color.parseColor("#1F659A"))
         })
         helper.addView(TextView(this).apply {
-            text = "• QR Scan → opens member card\n• Session cookies support protected photo requests\n• Multiple photo selectors with fallback\n• Disk image cache for faster repeat viewing\n• Sync button refreshes current profile\n• Long-press Member ID to copy"
+            text = "• SQL API V1.6 member details\n• QR Scan → opens member card\n• Photo fallback and local cache\n• Sync refreshes the active SQL member\n• Driver license masked for privacy\n• Long-press Member ID to copy"
             textSize = 14f
             setTextColor(Color.parseColor("#40586D"))
             setPadding(0, dp(8), 0, 0)
@@ -758,12 +761,25 @@ class MainActivity : ComponentActivity() {
 
     private fun refreshCurrent() {
         val url = currentMember?.profileUrl ?: return
-        Toast.makeText(this, "Syncing member profile…", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Refreshing YCTA member details…", Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { runCatching { repository.fetchByUrl(url) } }
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val uri = Uri.parse(url)
+                    val id = uri.getQueryParameter("id")?.toLongOrNull()
+                    if (uri.host.equals("ycta.aaii.asia", ignoreCase = true) &&
+                        uri.path?.endsWith("/mobile-api/v1/index.php") == true && id != null) {
+                        mobileApi.member(id).asMember()
+                    } else {
+                        repository.fetchByUrl(url)
+                    }
+                }
+            }
             result.onSuccess(::openSmartCard)
                 .onFailure {
-                    Toast.makeText(this@MainActivity, "Sync failed: " + (it.message ?: "Unknown error"), Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity,
+                        "Sync failed: " + (it.message ?: "Unknown error"),
+                        Toast.LENGTH_LONG).show()
                 }
         }
     }
