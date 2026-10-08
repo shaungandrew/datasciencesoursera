@@ -7,6 +7,17 @@ import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 /** SQL-backed member directory from the YCTA-owned server. */
+private fun friendlyTownship(slug: String): String {
+    val normalized = YctaGeography.normalized(slug)
+    val town = YctaGeography.districts.flatMap { it.townships }
+        .firstOrNull { t ->
+            (listOf(t.english) + t.aliases).any {
+                YctaGeography.normalized(it) == normalized
+            }
+        }
+    return town?.myanmar ?: slug.replace('-', ' ')
+}
+
 class YctaMobileApi {
     companion object { const val BASE = "https://ycta.aaii.asia/mobile-api/v1/index.php" }
 
@@ -38,17 +49,6 @@ class YctaMobileApi {
     }
     data class Page(val total: Int, val page: Int, val more: Boolean,
                     val note: String, val members: List<Row>)
-
-    private fun friendlyTownship(slug: String): String {
-        val normalized = YctaGeography.normalized(slug)
-        val town = YctaGeography.districts.flatMap { it.townships }
-            .firstOrNull { t ->
-                (listOf(t.english) + t.aliases).any {
-                    YctaGeography.normalized(it) == normalized
-                }
-            }
-        return town?.myanmar ?: slug.replace('-', ' ')
-    }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(18, TimeUnit.SECONDS)
