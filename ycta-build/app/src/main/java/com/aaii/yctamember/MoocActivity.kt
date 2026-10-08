@@ -582,6 +582,8 @@ class MoocActivity : ComponentActivity() {
     }
 
     private fun showLogin() {
+        if (loginOpen) return
+        loginOpen = true
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(4), dp(18), 0)
@@ -604,6 +606,7 @@ class MoocActivity : ComponentActivity() {
             .setNegativeButton("Cancel", null)
             .create()
 
+        dialog.setOnDismissListener { loginOpen = false }
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 lifecycleScope.launch {
@@ -621,6 +624,17 @@ class MoocActivity : ComponentActivity() {
                         status.text = "MOOC login ready."
                         dialog.dismiss()
                         Toast.makeText(this@MoocActivity, "Login successful", Toast.LENGTH_SHORT).show()
+                        val next = pendingSource
+                        pendingSource = null
+                        when (next) {
+                            "mooc", "youtube", "drive", "freehub" -> showSource(next)
+                            "search" -> if (pendingSearch.isNotBlank()) {
+                                val saved = pendingSearch
+                                pendingSearch = ""
+                                runSearch(saved)
+                            } else showSearch()
+                            else -> showHome()
+                        }
                     }.onFailure {
                         status.text = "Login failed: ${it.message}"
                         Toast.makeText(this@MoocActivity, it.message ?: "Login failed", Toast.LENGTH_LONG).show()
@@ -634,6 +648,9 @@ class MoocActivity : ComponentActivity() {
     private fun handleError(t: Throwable) {
         status.text = t.message ?: "MOOC module error"
         if (t is MoocApi.AuthException) {
+            api.clearToken()
+            if (pendingSource == null) pendingSource = activeSource
+            status.text = "MOOC session expired. Please log in again."
             Toast.makeText(this, "Login / Activation Code required.", Toast.LENGTH_LONG).show()
             showLogin()
         } else {
