@@ -1,9 +1,9 @@
-name: YCTA APK Build V6.1 MOOC 401 Fix
+name: YCTA APK Build V6.2 MOOC Login Fix
 
 on:
   push:
     branches:
-      - 'chatgpt-ycta-v61-mooc-401fix-*'
+      - 'chatgpt-ycta-v62-mooc-login-*'
 
 permissions:
   contents: read
@@ -24,10 +24,10 @@ jobs:
         run: |
           cd ycta-build
           gradle --no-daemon :app:assembleDebug --stacktrace
-          cp app/build/outputs/apk/debug/app-debug.apk ../YCTA_Member_Native_V6_1_MOOC_401Fix.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../YCTA_Member_Native_V6_2_MOOC_LoginFix.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: YCTA_Member_Native_V6_1_MOOC_401Fix_APK
-          path: YCTA_Member_Native_V6_1_MOOC_401Fix.apk
+          name: YCTA_Member_Native_V6_2_MOOC_LoginFix_APK
+          path: YCTA_Member_Native_V6_2_MOOC_LoginFix.apk
           if-no-files-found: error
