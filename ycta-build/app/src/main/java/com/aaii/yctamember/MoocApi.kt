@@ -144,7 +144,7 @@ class MoocApi(private val context: Context) {
     fun fetchCourses(source: String, force: Boolean = false): List<Course> {
         if (!force) {
             val cached = cachedCourses(source)
-            if (cached.isNotEmpty()) return cached
+            if (cached.isNotEmpty() && prefs.getInt("link_schema_$source", 0) >= 2) return cached
         }
         if (!hasToken()) throw AuthException("MOOC login or activation required.")
 
@@ -213,26 +213,54 @@ class MoocApi(private val context: Context) {
     }
 
     fun detail(course: Course): Course {
-        if (course.id.isBlank()) return course
-        val endpoints = when (course.sourceType.lowercase()) {
-            "mooc" -> listOf(
-                "mooc_course.php?id=${course.id}",
-                "course.php?id=${course.id}"
-            )
-            "freehub" -> listOf(
-                "directory_item.php?id=${course.id}",
-                "course.php?id=${course.id}"
-            )
-            else -> listOf("course.php?id=${course.id}")
+        if (normalizeRealUrl(course.url).isNotBlank()) return course
+
+        var result = course
+        if (course.id.isNotBlank()) {
+            val id = java.net.URLEncoder.encode(course.id, "UTF-8")
+            val endpoints = when (course.sourceType.lowercase()) {
+                "mooc" -> listOf(
+                    "mooc_course.php?id=$id", "course.php?id=$id",
+                    "courses.php?id=$id"
+                )
+                "youtube", "drive", "google_drive" -> listOf(
+                    "course.php?id=$id", "courses.php?id=$id",
+                    "lessons.php?course_id=$id",
+                    "sources.php?id=$id"
+                )
+                "freehub" -> listOf(
+                    "directory_item.php?id=$id", "course.php?id=$id",
+                    "free_hub_sources.php?id=$id"
+                )
+                else -> listOf("course.php?id=$id", "courses.php?id=$id")
+            }
+            endpoints.forEach { endpoint ->
+                val found = runCatching {
+                    parseSingleCourse(get(endpoint), course.sourceType.ifBlank { "mooc" })
+                }.getOrNull()
+                // A detail endpoint may return only a link (without a title).
+                if (found != null &&
+                    (found.id.isBlank() || found.id == course.id) &&
+                    (found.title.isNotBlank() || found.url.isNotBlank())) {
+                    result = merge(result, found)
+                    if (normalizeRealUrl(result.url).isNotBlank()) return result
+                }
+            }
         }
 
-        endpoints.forEach { relative ->
-            val found = runCatching {
-                parseSingleCourse(get(relative), course.sourceType.ifBlank { "mooc" })
-            }.getOrNull()
-            if (found != null && found.title.isNotBlank()) return merge(course, found)
+        // Legacy cached V6.4 records sometimes omitted the playable link.
+        // Refresh the actual source and match the same course, never another.
+        val source = course.sourceType.lowercase().ifBlank { "mooc" }
+        val list = runCatching { fetchCourses(source, true) }.getOrDefault(emptyList())
+        val matching = list.firstOrNull {
+            course.id.isNotBlank() && it.id == course.id
+        } ?: list.firstOrNull {
+            course.title.isNotBlank() &&
+            it.title.equals(course.title, ignoreCase = true) &&
+            (course.provider.isBlank() || it.provider.equals(course.provider, ignoreCase = true))
         }
-        return course
+        if (matching != null) result = merge(result, matching)
+        return result
     }
 
     fun certificateUrl(courseId: String): String =
@@ -609,7 +637,10 @@ class MoocApi(private val context: Context) {
                 put("certificate", c.certificate)
             })
         }
-        prefs.edit().putString("cache_$source", arr.toString()).apply()
+        prefs.edit()
+            .putString("cache_$source", arr.toString())
+            .putInt("link_schema_$source", 2)
+            .apply()
     }
 
     private fun cachedCourses(source: String): List<Course> {
