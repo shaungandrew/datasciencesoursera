@@ -9,6 +9,7 @@
         android:label="YCTA Taxi Digital Member + Library"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <activity android:name=".TownshipMembersActivity" android:exported="false" />
         <activity android:name=".MoocVideoPlayerActivity" android:exported="false" />
         <activity android:name=".MoocCourseDetailActivity" android:exported="false" />
         <activity android:name=".MoocActivity" android:exported="false" />
