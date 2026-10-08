@@ -1,9 +1,9 @@
-name: YCTA APK Build V6.6 MOOC DNS Fallback
+name: YCTA APK Build V6.7 Native Video Player
 
 on:
   push:
     branches:
-      - 'chatgpt-ycta-v66-mooc-dns-fallback-*'
+      - 'chatgpt-ycta-v67-native-video-*'
 
 permissions:
   contents: read
@@ -24,10 +24,10 @@ jobs:
         run: |
           cd ycta-build
           gradle --no-daemon :app:assembleDebug --stacktrace
-          cp app/build/outputs/apk/debug/app-debug.apk ../YCTA_Member_Native_V6_6_MOOC_DNS_Fallback.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../YCTA_Member_Native_V6_7_MOOC_NativeVideoPlayer.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: YCTA_Member_Native_V6_6_MOOC_DNS_Fallback_APK
-          path: YCTA_Member_Native_V6_6_MOOC_DNS_Fallback.apk
+          name: YCTA_Member_Native_V6_7_MOOC_NativeVideoPlayer_APK
+          path: YCTA_Member_Native_V6_7_MOOC_NativeVideoPlayer.apk
           if-no-files-found: error
