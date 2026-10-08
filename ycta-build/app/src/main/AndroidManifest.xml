@@ -9,7 +9,7 @@
         android:label="YCTA Taxi Digital Member + Library"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
-        <activity android:name=".EpubReaderActivity" android:exported="false" />
+        <activity android:name=".MoocCourseDetailActivity" android:exported="false" />\n        <activity android:name=".MoocActivity" android:exported="false" />\n        <activity android:name=".EpubReaderActivity" android:exported="false" />
         <activity android:name=".PdfReaderActivity" android:exported="false" />
         <activity android:name=".BookDetailActivity" android:exported="false" />
         <activity android:name=".LibraryActivity" android:exported="false" />
