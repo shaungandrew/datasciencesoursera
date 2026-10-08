@@ -508,15 +508,21 @@ class MoocApi(private val context: Context) {
      */
     private fun resolveCourseUrl(obj: JSONObject, source: String, depth: Int = 0): String {
         if (depth > 5) return ""
-        val keys = listOf(
+        val sourceKind = source.lowercase()
+        val mediaKeys = if (sourceKind in listOf(
+                "youtube", "youtube_videos", "youtube_playlists",
+                "drive", "google_drive", "drive_videos", "video"
+            )) listOf(
+                "youtube_url", "playlist_url", "video_url", "watch_url",
+                "embed_url", "drive_url", "youtube_link", "playlist_link",
+                "video_link", "watch_link", "drive_link", "play_url", "stream_url",
+                "lesson_url", "file_url", "content_url"
+            ) else emptyList()
+        val keys = mediaKeys + listOf(
             "url", "link", "course_url", "join_url", "enroll_url", "enrollment_url",
-            "website_url", "target_url", "provider_url", "aggregator_url",
-            "youtube_url", "youtube_link", "playlist_url", "playlist_link",
-            "video_url", "video_link", "watch_url", "watch_link", "embed_url",
-            "drive_url", "drive_link", "file_url", "source_url", "source_link",
+            "website_url", "target_url", "source_url", "source_link",
             "original_url", "external_url", "external_link", "learning_url",
-            "lesson_url", "play_url", "stream_url", "content_url", "href",
-            "web_url", "start_url"
+            "href", "web_url", "start_url"
         )
         for (key in keys) {
             val value = obj.opt(key)
@@ -576,6 +582,12 @@ class MoocApi(private val context: Context) {
                 }
             }
         }
+        // Enrollment/provider pages are useful fallbacks but should never
+        // override an actual nested video or playlist URL.
+        for (key in listOf("provider_url", "aggregator_url")) {
+            val url = normalizeRealUrl(obj.optString(key, ""))
+            if (url.isNotBlank()) return url
+        }
         return ""
     }
 
@@ -585,6 +597,10 @@ class MoocApi(private val context: Context) {
             raw.startsWith("https://", true) || raw.startsWith("http://", true) -> raw
             raw.startsWith("//") -> "https:$raw"
             raw.startsWith("/edu/mooc/") -> "https://www.aaii.asia$raw"
+            raw.startsWith("www.youtube.com/", true) ||
+                raw.startsWith("youtube.com/", true) ||
+                raw.startsWith("youtu.be/", true) ||
+                raw.startsWith("drive.google.com/", true) -> "https://$raw"
             else -> return ""
         }
         val parsed = runCatching { java.net.URI(url) }.getOrNull() ?: return ""
