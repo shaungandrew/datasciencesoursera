@@ -21,6 +21,8 @@ import android.widget.*
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.aaii.kilotaxi.common.CommunicationActivity
 import org.json.JSONArray
 import org.json.JSONObject
@@ -113,13 +115,24 @@ class MainActivity : ComponentActivity() {
         bottomBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
+            minimumHeight = dp(66)
             setPadding(dp(8), dp(7), dp(8), dp(7))
             setBackgroundColor(Color.WHITE)
             elevation = dp(10).toFloat()
             visibility = View.GONE
         }
-        shell.addView(bottomBar, LinearLayout.LayoutParams(-1, dp(66)))
+        shell.addView(bottomBar, LinearLayout.LayoutParams(-1, -2))
+
+        // Android 15 / target SDK 35 edge-to-edge:
+        // keep the app footer safely ABOVE the phone's gesture / 3-button navigation area.
+        ViewCompat.setOnApplyWindowInsetsListener(bottomBar) { view, insets ->
+            val nav = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            view.setPadding(dp(8), dp(7), dp(8), dp(7) + nav.bottom)
+            insets
+        }
+
         setContentView(shell)
+        ViewCompat.requestApplyInsets(bottomBar)
     }
 
     private fun showActivation() {
@@ -177,6 +190,7 @@ class MainActivity : ComponentActivity() {
         page.removeAllViews()
         bottomBar.visibility = View.VISIBLE
         buildBottomBar()
+        ViewCompat.requestApplyInsets(bottomBar)
 
         when (tab) {
             TAB_HOME -> renderHome()
@@ -219,7 +233,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun renderHome() {
-        page.addView(appHeader("DRIVER", "KILO TAXI • Native V6.2.1"))
+        page.addView(appHeader("DRIVER", "KILO TAXI • Native V6.2.2"))
 
         val onlineNow = prefs.getBoolean("online", false)
         val statusCard = card().apply {
