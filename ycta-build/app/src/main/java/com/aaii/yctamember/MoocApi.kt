@@ -438,19 +438,10 @@ class MoocApi(private val context: Context) {
             "excerpt",
             "about"
         )
-        val url = first(
-            o,
-            "url",
-            "link",
-            "course_url",
-            "join_url",
-            "enroll_url",
-            "website_url",
-            "youtube_url",
-            "playlist_url",
-            "drive_url",
-            "source_url"
-        )
+        // The original Panyar MOOC APK exposes several different link keys
+        // across MOOC, YouTube, Drive and Free Hub endpoints. Resolve them
+        // before falling back to the linked lesson/video objects.
+        val url = resolveCourseUrl(o, sourceFallback)
         val thumbnail = first(
             o,
             "thumbnail",
@@ -481,6 +472,97 @@ class MoocApi(private val context: Context) {
             thumbnail = thumbnail,
             certificate = certificate
         )
+    }
+
+    /**
+     * Resolve only URLs actually supplied by the API (or YouTube/Drive IDs
+     * supplied as explicit fields). Never invent enrollment URLs from titles.
+     */
+    private fun resolveCourseUrl(obj: JSONObject, source: String, depth: Int = 0): String {
+        if (depth > 5) return ""
+        val keys = listOf(
+            "url", "link", "course_url", "join_url", "enroll_url", "enrollment_url",
+            "website_url", "target_url", "provider_url", "aggregator_url",
+            "youtube_url", "youtube_link", "playlist_url", "playlist_link",
+            "video_url", "video_link", "watch_url", "watch_link", "embed_url",
+            "drive_url", "drive_link", "file_url", "source_url", "source_link",
+            "original_url", "external_url", "external_link", "learning_url",
+            "lesson_url", "play_url", "stream_url", "content_url", "href",
+            "web_url", "start_url"
+        )
+        for (key in keys) {
+            val value = obj.opt(key)
+            if (value is String) {
+                val url = normalizeRealUrl(value)
+                if (url.isNotBlank()) return url
+            }
+            if (value is JSONObject) {
+                val url = resolveCourseUrl(value, source, depth + 1)
+                if (url.isNotBlank()) return url
+            }
+        }
+
+        // Native source API sometimes supplies an ID instead of a full URL.
+        val youtubeId = first(obj, "youtube_video_id", "youtube_id", "video_id")
+        if (youtubeId.matches(Regex("[A-Za-z0-9_-]{11}")) &&
+            source.lowercase() in listOf("youtube", "video", "youtube_videos")) {
+            return "https://www.youtube.com/watch?v=$youtubeId"
+        }
+        val playlistId = first(obj, "youtube_playlist_id", "playlist_id")
+        if (playlistId.matches(Regex("[A-Za-z0-9_-]{12,80}")) &&
+            source.lowercase() in listOf("youtube", "youtube_playlists")) {
+            return "https://www.youtube.com/playlist?list=$playlistId"
+        }
+        val driveId = first(obj, "drive_file_id", "google_drive_file_id")
+        if (driveId.matches(Regex("[A-Za-z0-9_-]{20,100}")) &&
+            source.lowercase() in listOf("drive", "google_drive", "drive_videos")) {
+            return "https://drive.google.com/file/d/$driveId/view"
+        }
+
+        // Many sources keep the playable video under lessons/videos/modules.
+        val childKeys = listOf(
+            "lesson", "lessons", "video", "videos", "youtube_videos",
+            "youtube_playlists", "drive_videos", "playlist",
+            "modules", "items", "media", "resources", "content", "data"
+        )
+        for (key in childKeys) {
+            when (val child = obj.opt(key)) {
+                is JSONObject -> {
+                    val found = resolveCourseUrl(child, source, depth + 1)
+                    if (found.isNotBlank()) return found
+                }
+                is JSONArray -> {
+                    for (i in 0 until minOf(child.length(), 150)) {
+                        val item = child.opt(i)
+                        val found = when (item) {
+                            is JSONObject -> resolveCourseUrl(item, source, depth + 1)
+                            is String -> normalizeRealUrl(item)
+                            else -> ""
+                        }
+                        if (found.isNotBlank()) return found
+                    }
+                }
+                is String -> {
+                    val found = normalizeRealUrl(child)
+                    if (found.isNotBlank()) return found
+                }
+            }
+        }
+        return ""
+    }
+
+    private fun normalizeRealUrl(value: String): String {
+        val raw = value.trim().replace("&amp;", "&")
+        val url = when {
+            raw.startsWith("https://", true) || raw.startsWith("http://", true) -> raw
+            raw.startsWith("//") -> "https:$raw"
+            raw.startsWith("/edu/mooc/") -> "https://www.aaii.asia$raw"
+            else -> return ""
+        }
+        val parsed = runCatching { java.net.URI(url) }.getOrNull() ?: return ""
+        val scheme = parsed.scheme?.lowercase().orEmpty()
+        if (scheme !in listOf("http", "https") || parsed.host.isNullOrBlank()) return ""
+        return url
     }
 
     private fun normalizeSource(raw: String, url: String, fallback: String): String {
