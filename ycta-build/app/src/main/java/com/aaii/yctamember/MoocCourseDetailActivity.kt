@@ -280,10 +280,31 @@ class MoocCourseDetailActivity : ComponentActivity() {
     }
 
     private fun launchCourseUrl(url: String) {
+        val parsed = Uri.parse(url)
+        val host = parsed.host.orEmpty().lowercase()
+        val path = parsed.path.orEmpty().lowercase()
+        val source = current.sourceType.lowercase()
+        val isYoutube = host == "youtu.be" || host == "youtube.com" ||
+            host.endsWith(".youtube.com") ||
+            host == "youtube-nocookie.com" || host.endsWith(".youtube-nocookie.com")
+        val isDrive = host == "drive.google.com" || host == "docs.google.com"
+        val isDirectMedia = listOf(".mp4", ".m4v", ".mov", ".webm", ".m3u8", ".mpd")
+            .any { path.endsWith(it) } || host.endsWith(".googlevideo.com")
+        val isVideoSource = isYoutube || isDrive || isDirectMedia ||
+            source in listOf("youtube", "drive", "video")
+
         runCatching {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            if (isVideoSource) {
+                startActivity(Intent(this, MoocVideoPlayerActivity::class.java).apply {
+                    putExtra("video_url", url)
+                    putExtra("video_title", current.title)
+                    putExtra("video_source", current.sourceType)
+                })
+            } else {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            }
         }.onFailure {
-            Toast.makeText(this, "Unable to open video link: ${it.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Unable to open learning source: ${it.message}", Toast.LENGTH_LONG).show()
         }
     }
 
