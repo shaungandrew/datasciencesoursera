@@ -1,9 +1,9 @@
-name: KILO TAXI Production Suite V4 APKs
+name: KILO TAXI Communication V5 APKs
 
 on:
   push:
     branches:
-      - 'chatgpt-kilotaxi-suite-v4-*'
+      - 'chatgpt-kilotaxi-communication-v5-*'
 
 permissions:
   contents: read
@@ -20,19 +20,19 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build all role APKs
+      - name: Build V5 role APKs
         run: |
           cd kilo-suite
           gradle --no-daemon :callcenter:assembleDebug :driver:assembleDebug :passenger:assembleDebug --stacktrace
-          cp callcenter/build/outputs/apk/debug/callcenter-debug.apk ../KILO_TAXI_CallCenter_V4.apk
-          cp driver/build/outputs/apk/debug/driver-debug.apk ../KILO_TAXI_Driver_V4.apk
-          cp passenger/build/outputs/apk/debug/passenger-debug.apk ../KILO_TAXI_Passenger_V4.apk
-      - name: Upload role APKs
+          cp callcenter/build/outputs/apk/debug/callcenter-debug.apk ../KILO_TAXI_CallCenter_V5.apk
+          cp driver/build/outputs/apk/debug/driver-debug.apk ../KILO_TAXI_Driver_V5.apk
+          cp passenger/build/outputs/apk/debug/passenger-debug.apk ../KILO_TAXI_Passenger_V5.apk
+      - name: Upload V5 APKs
         uses: actions/upload-artifact@v4
         with:
-          name: KILO_TAXI_Production_Suite_V4_APKs
+          name: KILO_TAXI_Communication_V5_APKs
           path: |
-            KILO_TAXI_CallCenter_V4.apk
-            KILO_TAXI_Driver_V4.apk
-            KILO_TAXI_Passenger_V4.apk
+            KILO_TAXI_CallCenter_V5.apk
+            KILO_TAXI_Driver_V5.apk
+            KILO_TAXI_Passenger_V5.apk
           if-no-files-found: error

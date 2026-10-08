@@ -1,25 +1,17 @@
 plugins {
-    id("com.android.application")
+    id("com.android.library")
     id("org.jetbrains.kotlin.android")
 }
 android {
-    namespace = "com.aaii.kilotaxi.passenger"
+    namespace = "com.aaii.kilotaxi.common"
     compileSdk = 35
-    defaultConfig {
-        applicationId = "com.aaii.kilotaxi.passenger"
-        minSdk = 24
-        targetSdk = 35
-        versionCode = 5
-        versionName = "5.0.0"
-    }
-    buildTypes { release { isMinifyEnabled = false } }
+    defaultConfig { minSdk = 24 }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
 }
 dependencies {
-    implementation(project(":common"))
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.activity:activity-ktx:1.10.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("org.osmdroid:osmdroid-android:6.1.20")
+    implementation("io.github.webrtc-sdk:android:150.7871.01")
 }

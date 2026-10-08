@@ -3,5 +3,5 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories { google(); mavenCentral() }
 }
-rootProject.name = "KiloTaxiSuiteV4"
-include(":callcenter", ":driver", ":passenger")
+rootProject.name = "KiloTaxiSuiteV5"
+include(":common", ":callcenter", ":driver", ":passenger")
