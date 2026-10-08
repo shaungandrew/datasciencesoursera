@@ -13,9 +13,19 @@ class YctaMobileApi {
     data class DistrictCount(val slug: String, val count: Int, val unassigned: Int)
     data class TownCount(val slug: String, val count: Int)
     data class Row(val id: Long, val code: String, val name: String,
-                   val district: String, val township: String?, val photoUrl: String?) {
+                   val district: String, val township: String?, val photoUrl: String?,
+                   val driverLicenseMasked: String = "",
+                   val joinedDate: String = "", val vehicleNo: String = "",
+                   val cityNo: String = "", val membershipStatus: String = "") {
         fun asMember() = Member(
-            name = name, memberId = code, district = district,
+            name = name,
+            memberId = code,
+            driverLicense = driverLicenseMasked,
+            joinedDate = joinedDate,
+            vehicleNo = vehicleNo,
+            cityNo = cityNo,
+            district = district + (township?.let { " / $it" } ?: ""),
+            membershipStatus = membershipStatus,
             photoUrls = listOfNotNull(photoUrl?.takeIf { it.startsWith("https://") }),
             maskedPhone = "Protected", maskedNrc = "Protected",
             maskedAddress = "Protected",
@@ -100,8 +110,14 @@ class YctaMobileApi {
 
     fun member(id: Long): Row {
         val r=get("action" to "member","id" to id.toString()).getJSONObject("member")
+        fun field(k: String) = r.optString(k).takeUnless { it == "null" || it.isBlank() }.orEmpty()
         return Row(r.optLong("id"),r.optString("member_code"),r.optString("name"),
-          r.optString("district"),r.optString("township_slug").takeIf { it.isNotBlank() && it!="null" },
-                r.optString("photo_url").takeIf { it.startsWith("https://") })
+            r.optString("district"),r.optString("township_slug").takeIf { it.isNotBlank() && it!="null" },
+            r.optString("photo_url").takeIf { it.startsWith("https://") },
+            driverLicenseMasked = field("driver_license_masked"),
+            joinedDate = field("joined_date"),
+            vehicleNo = field("vehicle_no"),
+            cityNo = field("city_no"),
+            membershipStatus = field("membership_status"))
     }
 }
