@@ -15,13 +15,21 @@ import org.json.JSONObject
 import kotlin.concurrent.thread
 
 class DriverLocationService:Service(),LocationListener{
-    companion object{const val PREFS="kilo_driver_v4";const val API="https://ycta.yangoncity.net/kilotaxi/api/index.php";const val CHANNEL="kilo_driver_gps"}
+    companion object{const val PREFS="kilo_driver_v4";const val API="https://ycta.aaii.asia/api/index.php";const val OLD_API="https://ycta.yangoncity.net/kilotaxi/api/index.php";const val CHANNEL="kilo_driver_gps"}
     private lateinit var lm:LocationManager
     private lateinit var api:ApiClient
     private var lastSentAt=0L
     private var lastLat=Double.NaN
     private var lastLng=Double.NaN
-    override fun onCreate(){super.onCreate();lm=getSystemService(LOCATION_SERVICE) as LocationManager;val p=getSharedPreferences(PREFS,MODE_PRIVATE);api=ApiClient{p.getString("api",API)?:API};if(android.os.Build.VERSION.SDK_INT>=26)(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(NotificationChannel(CHANNEL,"KILO TAXI Driver GPS",NotificationManager.IMPORTANCE_LOW))}
+    override fun onCreate(){
+        super.onCreate()
+        lm=getSystemService(LOCATION_SERVICE) as LocationManager
+        val p=getSharedPreferences(PREFS,MODE_PRIVATE)
+        val saved=p.getString("api","").orEmpty().trim()
+        if(saved.isBlank()||saved==OLD_API)p.edit().putString("api",API).apply()
+        api=ApiClient{p.getString("api",API)?:API}
+        if(android.os.Build.VERSION.SDK_INT>=26)(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(NotificationChannel(CHANNEL,"KILO TAXI Driver GPS",NotificationManager.IMPORTANCE_LOW))
+    }
     override fun onStartCommand(i:Intent?,f:Int,id:Int):Int{
         val p=getSharedPreferences(PREFS,MODE_PRIVATE);if(!p.getBoolean("online",false)||p.getString("token","").isNullOrBlank()){stopSelf();return START_NOT_STICKY}
         val pi=PendingIntent.getActivity(this,0,Intent(this,MainActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
