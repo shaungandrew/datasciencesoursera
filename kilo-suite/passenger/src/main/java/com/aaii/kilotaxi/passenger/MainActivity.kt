@@ -1,6 +1,7 @@
 package com.aaii.kilotaxi.passenger
 
 import android.Manifest
+import com.aaii.kilotaxi.common.CommunicationActivity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -62,7 +63,7 @@ class MainActivity:ComponentActivity(){
                 val d=JSONObject().put("passenger_name",name.text.toString()).put("passenger_phone",phone.text.toString()).put("district",district.selectedItem.toString()).put("pickup",pickup.text.toString()).put("destination",dest.text.toString())
                 lat.text.toString().toDoubleOrNull()?.let{d.put("pickup_lat",it)};lng.text.toString().toDoubleOrNull()?.let{d.put("pickup_lng",it)};dlat.text.toString().toDoubleOrNull()?.let{d.put("destination_lat",it)};dlng.text.toString().toDoubleOrNull()?.let{d.put("destination_lng",it)}
                 out.text="Booking…";call({api.post("passenger_create_booking",d)}){j->
-                    val code=j.optString("booking_code");val otp=j.optString("pickup_otp");prefs.edit().putString("code",code).putString("phone",phone.text.toString()).putString("otp",otp).apply()
+                    val code=j.optString("booking_code");val otp=j.optString("pickup_otp");prefs.edit().putString("code",code).putString("phone",phone.text.toString()).putString("otp",otp).putString("passenger_token",j.optString("passenger_token")).putInt("room_id",j.optInt("room_id")).apply()
                     val dr=j.optJSONObject("driver")?:JSONObject();out.text="Booking: $code\nPickup OTP: $otp\nStatus: "+j.optString("status")+"\nDriver: "+dr.optString("name")+" • "+dr.optString("member_id")+" • "+dr.optString("vehicle_no")
                 }
             }})
@@ -86,6 +87,30 @@ class MainActivity:ComponentActivity(){
         val lat=d.optDouble("lat",Double.NaN);val lng=d.optDouble("lng",Double.NaN);if(!lat.isNaN()&&!lng.isNaN()){map?.onDetach();val m=MapView(this).apply{setMultiTouchControls(true);controller.setZoom(15.0);controller.setCenter(GeoPoint(lat,lng))};map=m;Marker(m).apply{position=GeoPoint(lat,lng);title="Your Driver";snippet=d.optString("vehicle_no");setAnchor(Marker.ANCHOR_CENTER,Marker.ANCHOR_BOTTOM);m.overlays.add(this)};val pLat=b.optDouble("pickup_lat",Double.NaN);val pLng=b.optDouble("pickup_lng",Double.NaN);if(!pLat.isNaN()&&!pLng.isNaN())Marker(m).apply{position=GeoPoint(pLat,pLng);title="Pickup";setAnchor(Marker.ANCHOR_CENTER,Marker.ANCHOR_BOTTOM);m.overlays.add(this)};box.addView(m,LinearLayout.LayoutParams(-1,dp(300)))}
     }}
 
+    private fun openCommunication(){
+        val existing=prefs.getString("passenger_token","").orEmpty()
+        if(existing.isNotBlank()){
+            startActivity(Intent(this,CommunicationActivity::class.java)
+                .putExtra(CommunicationActivity.EXTRA_API,prefs.getString("api",API)?:API)
+                .putExtra(CommunicationActivity.EXTRA_TOKEN,existing)
+                .putExtra(CommunicationActivity.EXTRA_ROLE,"passenger")
+                .putExtra(CommunicationActivity.EXTRA_TITLE,"Booking Chat + KILO Assistant V5"))
+            return
+        }
+        val code=prefs.getString("code","").orEmpty()
+        val phone=prefs.getString("phone","").orEmpty()
+        if(code.isBlank()||phone.isBlank()){toast("Create or track a booking first.");return}
+        call({api.post("passenger_claim_booking",JSONObject().put("booking_code",code).put("passenger_phone",phone))}){j->
+            val t=j.optString("passenger_token")
+            prefs.edit().putString("passenger_token",t).putInt("room_id",j.optInt("room_id")).apply()
+            startActivity(Intent(this,CommunicationActivity::class.java)
+                .putExtra(CommunicationActivity.EXTRA_API,prefs.getString("api",API)?:API)
+                .putExtra(CommunicationActivity.EXTRA_TOKEN,t)
+                .putExtra(CommunicationActivity.EXTRA_ROLE,"passenger")
+                .putExtra(CommunicationActivity.EXTRA_TITLE,"Booking Chat + KILO Assistant V5"))
+        }
+    }
+
     private fun fareCard(){
         val km=edit("Estimated Distance KM");val wait=edit("Waiting Minutes (optional)");val out=TextView(this)
         root.addView(card().apply{addView(section("FARE ESTIMATE"));addView(km);addView(wait);addView(Button(this@MainActivity).apply{text="Estimate Fare";isAllCaps=false;setOnClickListener{val d=JSONObject().put("distance_km",km.text.toString().toDoubleOrNull()?:0.0).put("waiting_minutes",wait.text.toString().toDoubleOrNull()?:0.0);call({api.post("passenger_fare_estimate",d)}){j->out.text="Base: "+j.optString("base_fare")+"\nRate/KM: "+j.optString("rate_per_km")+"\nEstimated Fare: "+j.optString("estimated_fare")}}});addView(out)},margin())
@@ -94,7 +119,7 @@ class MainActivity:ComponentActivity(){
     private fun requestLocation(done:(Double,Double)->Unit){locationDone=done;if(ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)useLastLocation()else perm.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION))}
     private fun useLastLocation(){if(ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED&&ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED)return;val lm=getSystemService(LOCATION_SERVICE) as LocationManager;val l=runCatching{lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)?:lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)}.getOrNull();if(l!=null)locationDone?.invoke(l.latitude,l.longitude)else toast("Current GPS not available yet.");locationDone=null}
     private fun call(fn:()->JSONObject,done:(JSONObject)->Unit){thread{val r=runCatching(fn).getOrElse{JSONObject().put("ok",false).put("error",it.message?:"Network error")};runOnUiThread{if(r.optBoolean("ok"))done(r)else toast(r.optString("error","Request failed"))}}}
-    private fun head()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;addView(TextView(this@MainActivity).apply{text="KILO TAXI";letterSpacing=.15f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#B36A12"))});addView(TextView(this@MainActivity).apply{text="PASSENGER V4";textSize=29f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#674313"))});addView(TextView(this@MainActivity).apply{text="Book • OTP • Track Driver • Fare"})}
+    private fun head()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;addView(TextView(this@MainActivity).apply{text="KILO TAXI";letterSpacing=.15f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#B36A12"))});addView(TextView(this@MainActivity).apply{text="PASSENGER V5";textSize=29f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#674313"))});addView(TextView(this@MainActivity).apply{text="Book • OTP • Track Driver • Fare"})}
     private fun card()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(14),dp(14),dp(14));background=round(Color.WHITE);elevation=dp(3).toFloat()}
     private fun section(s:String)=TextView(this).apply{text=s;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#9B5C0B"));setPadding(0,0,0,dp(6))}
     private fun edit(h:String)=EditText(this).apply{hint=h;setPadding(dp(10),dp(9),dp(10),dp(9))}
