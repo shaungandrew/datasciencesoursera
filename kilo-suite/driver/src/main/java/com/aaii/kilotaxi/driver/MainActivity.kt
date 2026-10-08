@@ -712,7 +712,8 @@ class MainActivity : ComponentActivity() {
             "INVALID_TRANSITION" -> "Trip status changed. Refreshing is required."
             "INVALID_PICKUP_OTP" -> "Pickup OTP is incorrect."
             "OTP_LOCKED" -> "OTP is locked. Contact Call Center."
-            "MEMBERSHIP_EXPIRED" -> "Membership expired. Please renew."\n            "ACTIVE_TRIP_CANNOT_GO_OFFLINE" -> "Complete or reject the active job before going offline."
+            "MEMBERSHIP_EXPIRED" -> "Membership expired. Please renew."
+            "ACTIVE_TRIP_CANNOT_GO_OFFLINE" -> "Complete or reject the active job before going offline."
             else -> error.replace("_", " ")
         }
     }
