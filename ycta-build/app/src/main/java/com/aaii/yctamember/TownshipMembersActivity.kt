@@ -19,7 +19,7 @@ import kotlinx.coroutines.withContext
 
 class TownshipMembersActivity : ComponentActivity() {
     private val geography = YctaGeography
-    private lateinit var repo: YctaRepository
+    private val api = YctaMobileApi()
     private lateinit var root: LinearLayout
     private lateinit var content: LinearLayout
     private lateinit var scroll: ScrollView
@@ -33,7 +33,6 @@ class TownshipMembersActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        repo = YctaRepository(cacheDir)
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#EEF3F8"))
@@ -108,136 +107,132 @@ class TownshipMembersActivity : ComponentActivity() {
         layoutParams = LinearLayout.LayoutParams(0,-2,1f)
     }
 
+    private fun slug(text: String): String =
+        text.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-').let {
+            if (it == "twante") "twantay" else it
+        }
+
     private fun showDistricts() {
-        generation++
-        loading.visibility = View.GONE
-        district = null
-        township = null
-        heading.text = "ခရိုင် ၁၄ ခု"
-        summary.text = "14 Districts • 44 Townships"
-        content.removeAllViews()
-        content.addView(message("ခရိုင်ရွေးပါ • Select a district"))
-        geography.districts.forEachIndexed { i, d ->
-            content.addView(card(
-                (i+1).toString()+". "+d.myanmar,
-                d.english+" District • "+d.townships.size+" townships"
-            ) { showTownships(d) })
-        }
-        scroll.scrollTo(0,0)
-    }
-
-    private fun showTownships(d: YctaGeography.District) {
-        generation++
-        loading.visibility = View.GONE
-        district = d
-        township = null
-        heading.text = d.myanmar+" ခရိုင်"
-        summary.text = d.english+" • "+d.townships.size+" Townships"
-        content.removeAllViews()
-        content.addView(message("မြို့နယ်တစ်ခုရွေးပြီး Member တွေကြည့်ပါ။"))
-        d.townships.forEachIndexed { i,t ->
-            content.addView(card(
-                (i+1).toString()+". "+t.myanmar,
-                t.english+" Township"
-            ) { loadMembers(t) })
-        }
-        scroll.scrollTo(0,0)
-    }
-
-    private fun loadMembers(t: YctaGeography.Township) {
-        val d = district ?: return
         val seq = ++generation
-        township = t
         loading.visibility = View.VISIBLE
-        heading.text = t.myanmar+" မြို့နယ်"
-        summary.text = d.english+" District • YCTA Members"
+        district = null; township = null
+        heading.text = "ခရိုင် ၁၄ ခု"
+        summary.text = "14 Districts • 44 Townships • SQL Mobile API"
         content.removeAllViews()
-        content.addView(message("YCTA member-search website မှရှာနေပါသည်…"))
+        content.addView(message("Loading district totals from ycta.aaii.asia…"))
         lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching {
-                    val records = linkedMapOf<String, MemberSummary>()
-                    val failures = mutableListOf<String>()
-                    for (query in listOf(t.myanmar,t.english)) {
-                        when (val found = repo.search(query)) {
-                            is SearchOutcome.Results ->
-                                found.members.forEach { records[it.profileUrl] = it }
-                            is SearchOutcome.Direct -> {
-                                val m = found.member
-                                if (geography.matchesTownship(m.district,t)) {
-                                    records[m.profileUrl] = MemberSummary(
-                                        m.name.ifBlank { "YCTA Member" },
-                                        "Member ID: "+m.memberId+" • "+m.district,
-                                        m.profileUrl
-                                    )
-                                }
-                            }
-                            is SearchOutcome.Failure -> failures.add(found.message)
-                        }
-                    }
-                    Pair(records.values.toList(),failures)
-                }
-            }
+            val result=withContext(Dispatchers.IO) { runCatching { api.districts() } }
             if (seq != generation) return@launch
             loading.visibility = View.GONE
             content.removeAllViews()
-            result.onSuccess { pair ->
-                val members = pair.first
-                if (members.isEmpty()) {
-                    content.addView(message(
-                        "ဤမြို့နယ်အတွက် public search results မတွေ့ပါ။" +
-                        " This does not mean no members exist."
-                    ))
-                } else {
-                    content.addView(message(
-                        members.size.toString()+" website search results." +
-                        " Tap a member to verify township and open Smart Card." +
-                        " Full member totals require a dedicated township API."
-                    ))
-                    members.forEach { m ->
-                        content.addView(card(
-                            m.title,
-                            m.subtitle.ifBlank { "YCTA Member • View profile" }
-                        ) { openMember(m,t) })
-                    }
-                }
-                if (pair.second.isNotEmpty()) {
-                    content.addView(message("Some search queries returned no results."))
-                }
-            }.onFailure {
-                content.addView(message("Website search error: "+(it.message ?: "Network error")))
+            val totals=result.getOrNull()?.associateBy { it.slug } ?: emptyMap()
+            result.onFailure {
+                content.addView(message("Mobile API: ${it.message}. Install server ZIP and run sync first."))
+            }
+            geography.districts.forEachIndexed { i, d ->
+                val r=totals[slug(d.english)]
+                val description=if(r==null) "API not connected yet"
+                  else "${r.count} members • ${r.unassigned} township unassigned"
+                content.addView(card("${i+1}. ${d.myanmar}",description) { showTownships(d) })
             }
             scroll.scrollTo(0,0)
         }
     }
 
-    private fun openMember(item: MemberSummary, t: YctaGeography.Township) {
-        val seq = generation
+    private fun showTownships(d: YctaGeography.District) {
+        val seq = ++generation
+        district = d; township = null
+        heading.text = d.myanmar+" ခရိုင်"
+        summary.text = d.english+" • ${d.townships.size} Townships"
         loading.visibility = View.VISIBLE
+        content.removeAllViews()
+        content.addView(message("Loading township member counts from SQL API…"))
         lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching { repo.fetchByUrl(item.profileUrl) }
-            }
-            if (seq != generation) return@launch
+            val result=withContext(Dispatchers.IO) { runCatching { api.towns(slug(d.english)) } }
+            if(seq!=generation)return@launch
             loading.visibility = View.GONE
-            result.onSuccess { member ->
-                if (member.district.isNotBlank() &&
-                    !geography.matchesTownship(member.district,t)) {
-                    android.app.AlertDialog.Builder(this@TownshipMembersActivity)
-                        .setTitle("Township does not match")
-                        .setMessage("Selected: "+t.myanmar+
-                            "\nProfile: "+member.district+
-                            "\nThis member belongs to a different township.")
-                        .setPositiveButton("OK",null)
-                        .show()
-                } else {
-                    startActivity(Intent(this@TownshipMembersActivity,MainActivity::class.java)
-                        .putExtra("member_profile_url",member.profileUrl))
+            content.removeAllViews()
+            result.onSuccess { pair ->
+                val counts=pair.first.associateBy { it.slug }
+                content.addView(message(
+                    "District members with unassigned townships: ${pair.second}. " +
+                    "The original SQL stores District only; township assignment is done by Admin."
+                ))
+                content.addView(card("ALL ${d.myanmar} ခရိုင် Members",
+                    "View all members in this district (assigned and unassigned)") {
+                    loadPage(null,1)
+                })
+                d.townships.forEachIndexed { i,t ->
+                    val count=counts[slug(t.english)]?.count ?: 0
+                    content.addView(card("${i+1}. ${t.myanmar}",
+                        "${t.english} Township • $count assigned members") {
+                        loadPage(t,1)
+                    })
                 }
             }.onFailure {
+                content.addView(message("API unavailable: ${it.message}. Upload server ZIP and run setup."))
+                d.townships.forEach { t ->
+                    content.addView(card(t.myanmar,"Load SQL-linked members") {loadPage(t,1)})
+                }
+            }
+            scroll.scrollTo(0,0)
+        }
+    }
+
+    private fun loadMembers(t: YctaGeography.Township) = loadPage(t,1)
+
+    private fun loadPage(t: YctaGeography.Township?, page: Int) {
+        val d=district ?: return
+        val seq=++generation
+        township=t
+        heading.text=(t?.myanmar ?: d.myanmar)+" • Members"
+        summary.text="SQL-linked YCTA Directory • Page $page"
+        loading.visibility=View.VISIBLE
+        content.removeAllViews()
+        content.addView(message("Fetching members from ycta.aaii.asia…"))
+        lifecycleScope.launch {
+            val result=withContext(Dispatchers.IO) {
+                runCatching { api.members(slug(d.english),t?.let { slug(it.english) },page) }
+            }
+            if(seq!=generation)return@launch
+            loading.visibility=View.GONE
+            content.removeAllViews()
+            result.onSuccess { p ->
+                content.addView(message("${p.total} matched records • page ${p.page}" +
+                     if(p.note.isBlank()) "" else "\n"+p.note))
+                if(p.members.isEmpty()) content.addView(message(
+                     "No assigned members in this township yet. Admin must map members from the SQL district."
+                ))
+                p.members.forEach { m ->
+                    content.addView(card(m.name.ifBlank { "YCTA Member" },
+                        "${m.code} • ${m.district}") { openMember(m.id) })
+                }
+                if(page>1) content.addView(card("← Previous Page","Page ${page-1}") {
+                    loadPage(t,page-1)
+                })
+                if(p.more) content.addView(card("Next Page →","Load 25 more members") {
+                    loadPage(t,page+1)
+                })
+            }.onFailure {
+                content.addView(message("Cannot fetch SQL member list: ${it.message}"))
+            }
+            scroll.scrollTo(0,0)
+        }
+    }
+
+    private fun openMember(id: Long) {
+        val seq=generation
+        loading.visibility=View.VISIBLE
+        lifecycleScope.launch {
+            val result=withContext(Dispatchers.IO) { runCatching { api.member(id) } }
+            if(seq!=generation)return@launch
+            loading.visibility=View.GONE
+            result.onSuccess {
+                startActivity(Intent(this@TownshipMembersActivity,MainActivity::class.java)
+                    .putExtra("mobile_api_member_id",id))
+            }.onFailure {
                 Toast.makeText(this@TownshipMembersActivity,
-                    "Profile unavailable: "+(it.message ?: "Network error"),
-                    Toast.LENGTH_LONG).show()
+                    "Member profile unavailable: ${it.message}",Toast.LENGTH_LONG).show()
             }
         }
     }
