@@ -9,6 +9,7 @@ data class Member(
     val cityNo: String = "",
     val district: String = "",
     val membershipStatus: String = "",
+    val apiVersion: String = "",
     val photoUrls: List<String> = emptyList(),
     val maskedPhone: String = "",
     val maskedNrc: String = "",
