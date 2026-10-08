@@ -16,7 +16,9 @@ class YctaMobileApi {
                    val district: String, val township: String?, val photoUrl: String?,
                    val driverLicenseMasked: String = "",
                    val joinedDate: String = "", val vehicleNo: String = "",
-                   val cityNo: String = "", val membershipStatus: String = "") {
+                   val cityNo: String = "", val membershipStatus: String = "",
+                   val imageCandidates: List<String> = emptyList(),
+                   val apiVersion: String = "") {
         fun asMember() = Member(
             name = name,
             memberId = code,
@@ -24,9 +26,11 @@ class YctaMobileApi {
             joinedDate = joinedDate,
             vehicleNo = vehicleNo,
             cityNo = cityNo,
-            district = district + (township?.let { " / $it" } ?: ""),
+            district = district + (township?.let { " / " + friendlyTownship(it) } ?: ""),
             membershipStatus = membershipStatus,
-            photoUrls = listOfNotNull(photoUrl?.takeIf { it.startsWith("https://") }),
+            apiVersion = apiVersion,
+            photoUrls = (imageCandidates + listOfNotNull(photoUrl)).distinct()
+                .filter { it.startsWith("https://") },
             maskedPhone = "Protected", maskedNrc = "Protected",
             maskedAddress = "Protected",
             profileUrl = "$BASE?action=member&id=$id"
@@ -34,6 +38,17 @@ class YctaMobileApi {
     }
     data class Page(val total: Int, val page: Int, val more: Boolean,
                     val note: String, val members: List<Row>)
+
+    private fun friendlyTownship(slug: String): String {
+        val normalized = YctaGeography.normalized(slug)
+        val town = YctaGeography.districts.flatMap { it.townships }
+            .firstOrNull { t ->
+                (listOf(t.english) + t.aliases).any {
+                    YctaGeography.normalized(it) == normalized
+                }
+            }
+        return town?.myanmar ?: slug.replace('-', ' ')
+    }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(18, TimeUnit.SECONDS)
@@ -109,7 +124,13 @@ class YctaMobileApi {
     }
 
     fun member(id: Long): Row {
-        val r=get("action" to "member","id" to id.toString()).getJSONObject("member")
+        val response = get("action" to "member","id" to id.toString())
+        val r = response.getJSONObject("member")
+        val candidates = r.optJSONArray("photo_urls")?.let { arr ->
+            (0 until arr.length()).mapNotNull { i ->
+                arr.optString(i).takeIf { it.startsWith("https://") }
+            }
+        }.orEmpty()
         fun field(k: String) = r.optString(k).takeUnless { it == "null" || it.isBlank() }.orEmpty()
         return Row(r.optLong("id"),r.optString("member_code"),r.optString("name"),
             r.optString("district"),r.optString("township_slug").takeIf { it.isNotBlank() && it!="null" },
@@ -118,6 +139,8 @@ class YctaMobileApi {
             joinedDate = field("joined_date"),
             vehicleNo = field("vehicle_no"),
             cityNo = field("city_no"),
-            membershipStatus = field("membership_status"))
+            membershipStatus = field("membership_status"),
+            imageCandidates = candidates,
+            apiVersion = response.optString("api_version").ifBlank { "unknown" })
     }
 }
