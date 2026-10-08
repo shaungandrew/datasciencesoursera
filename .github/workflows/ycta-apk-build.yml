@@ -1,9 +1,9 @@
-name: YCTA APK Build V7.1 Native Card Dashboard Search
+name: YCTA APK Build V7.2 AAII Standalone Member Details
 
 on:
   push:
     branches:
-      - 'chatgpt-ycta-v71-native-cards-sql-search-*'
+      - 'chatgpt-ycta-v72-aaii-standalone-memberdetails-*'
 
 permissions:
   contents: read
@@ -35,7 +35,7 @@ jobs:
         run: |
           cd ycta-build
           gradle --no-daemon :app:assembleDebug --stacktrace
-          cp app/build/outputs/apk/debug/app-debug.apk ../YCTA_Member_Native_V7_1_CardDashboard_SQLSearch_PreBrand.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../YCTA_AAII_Standalone_V7_2_SQL_MemberDetails_PreBrand.apk
       - name: Bundle APK packaging tools
         run: |
           mkdir -p android-tools
@@ -47,9 +47,9 @@ jobs:
       - name: Upload APK and packaging tools
         uses: actions/upload-artifact@v4
         with:
-          name: YCTA_Member_Native_V7_1_CardDashboard_SQLSearch_BuildBundle
+          name: YCTA_AAII_Standalone_V7_2_SQL_MemberDetails_BuildBundle
           path: |
-            YCTA_Member_Native_V7_1_CardDashboard_SQLSearch_PreBrand.apk
+            YCTA_AAII_Standalone_V7_2_SQL_MemberDetails_PreBrand.apk
             android-tools/apksigner.jar
             android-tools/zipalign
           if-no-files-found: error
