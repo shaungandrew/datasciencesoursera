@@ -107,7 +107,7 @@ class MainActivity : ComponentActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(14), dp(16), dp(28))
         }
-        scroll.addView(page, ScrollView.LayoutParams(-1, -2))
+        scroll.addView(page)
         shell.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
 
         bottomBar = LinearLayout(this).apply {
@@ -712,7 +712,7 @@ class MainActivity : ComponentActivity() {
             "INVALID_TRANSITION" -> "Trip status changed. Refreshing is required."
             "INVALID_PICKUP_OTP" -> "Pickup OTP is incorrect."
             "OTP_LOCKED" -> "OTP is locked. Contact Call Center."
-            "MEMBERSHIP_EXPIRED" -> "Membership expired. Please renew."
+            "MEMBERSHIP_EXPIRED" -> "Membership expired. Please renew."\n            "ACTIVE_TRIP_CANNOT_GO_OFFLINE" -> "Complete or reject the active job before going offline."
             else -> error.replace("_", " ")
         }
     }
