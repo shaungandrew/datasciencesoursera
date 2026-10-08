@@ -76,6 +76,10 @@ class MainActivity : ComponentActivity() {
             isFillViewport = true
             addView(root)
         })
+
+        intent?.getStringExtra("member_profile_url")
+            ?.takeIf { it.isNotBlank() }
+            ?.let { memberUrl -> doSearch(memberUrl) }
     }
 
     private fun buildSearchArea(): LinearLayout {
@@ -157,6 +161,17 @@ class MainActivity : ComponentActivity() {
             actions.addView(scanBtn, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(5) })
             searchCard.addView(actions)
             addView(searchCard)
+
+            addView(Button(this@MainActivity).apply {
+                text = "14 Districts • 44 Townships • Members"
+                isAllCaps = false
+                setTextColor(Color.WHITE)
+                backgroundTintList = android.content.res.ColorStateList.valueOf(
+                    Color.parseColor("#1567A9"))
+                setOnClickListener {
+                    startActivity(Intent(this@MainActivity, TownshipMembersActivity::class.java))
+                }
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
 
             addView(Button(this@MainActivity).apply {
                 text = "LIBRARY • Native eLibrary"
