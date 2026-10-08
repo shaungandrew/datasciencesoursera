@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.BitmapFactory
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.location.LocationManager
@@ -14,6 +15,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.text.InputType
 import android.util.Base64
 import android.widget.*
@@ -23,6 +25,7 @@ import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.ByteArrayOutputStream
 import kotlin.concurrent.thread
 
 class CommunicationActivity : ComponentActivity() {
@@ -46,6 +49,14 @@ class CommunicationActivity : ComponentActivity() {
     private var pendingLocationRoom = 0
     private val handler = Handler(Looper.getMainLooper())
     private var incomingDialogShownFor = 0
+    private val litePrefs by lazy { getSharedPreferences("kilo_comm_v6", MODE_PRIVATE) }
+    private var liteMode = true
+    private var networkBadge: TextView? = null
+    private var roomsBox: LinearLayout? = null
+    private val chatHandler = Handler(Looper.getMainLooper())
+    private var activeRoomId = 0
+    private var activeMessageList: LinearLayout? = null
+    private var lastMessageId = 0
 
     private val photoPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null && selectedRoomId > 0) uploadUri(uri, selectedRoomId, "image")
@@ -66,6 +77,7 @@ class CommunicationActivity : ComponentActivity() {
         apiUrl = intent.getStringExtra(EXTRA_API).orEmpty()
         token = intent.getStringExtra(EXTRA_TOKEN).orEmpty()
         role = intent.getStringExtra(EXTRA_ROLE).orEmpty()
+        liteMode = litePrefs.getBoolean("lite_mode", true)
         api = CommApi(apiUrl, token)
         window.statusBarColor = Color.parseColor("#263A57")
         root = LinearLayout(this).apply {
@@ -80,10 +92,12 @@ class CommunicationActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         handler.post(incomingPoll)
+        if (activeRoomId > 0 && activeMessageList != null) chatHandler.post(chatPoll)
     }
 
     override fun onPause() {
         handler.removeCallbacks(incomingPoll)
+        chatHandler.removeCallbacks(chatPoll)
         super.onPause()
     }
 
@@ -117,17 +131,30 @@ class CommunicationActivity : ComponentActivity() {
                     }
                 }
             }
-            handler.postDelayed(this, 4000)
+            handler.postDelayed(this, if (liteMode) 10000 else 4000)
         }
     }
 
     private fun showRooms() {
+        activeRoomId = 0
+        activeMessageList = null
+        lastMessageId = 0
+        chatHandler.removeCallbacks(chatPoll)
         selectedRoomId = 0
         root.removeAllViews()
-        root.addView(header("KILO TAXI", intent.getStringExtra(EXTRA_TITLE) ?: "Communication V5"))
+        root.addView(header("KILO TAXI", intent.getStringExtra(EXTRA_TITLE) ?: "Communication V6 Lite"))
+
+        networkBadge = TextView(this).apply {
+            text = if (liteMode) "● Lite Mode • Network checking…" else "● Standard Mode • Network checking…"
+            textSize = 12f
+            setTextColor(Color.parseColor("#5F7488"))
+            setPadding(dp(4), dp(5), dp(4), dp(5))
+        }
+        root.addView(networkBadge)
+
         root.addView(card().apply {
             addView(TextView(this@CommunicationActivity).apply {
-                text = "Zalo-style Taxi Communication\nBooking Chat • Driver Groups • Call Center • Voice • Photo • Location • Calls"
+                text = "Lightweight Taxi Communication\nIncremental Chat • Quick Reply • Voice • Photo Compress • Location • Calls"
                 textSize = 14f
                 setTextColor(Color.parseColor("#52667A"))
             })
@@ -145,24 +172,35 @@ class CommunicationActivity : ComponentActivity() {
         }
 
         val actions = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        actions.addView(Switch(this).apply {
+            text = "Lite Mode — save battery / data"
+            isChecked = liteMode
+            setOnCheckedChangeListener { _, checked ->
+                liteMode = checked
+                litePrefs.edit().putBoolean("lite_mode", checked).apply()
+                toast(if (checked) "Lite Mode ON" else "Standard Mode ON")
+                showRooms()
+            }
+        })
         actions.addView(button("Refresh Chatrooms") { loadRooms() })
         actions.addView(button("KILO Chatbot") { chatbotDialog() })
         if (role == "driver" || role == "passenger") actions.addView(button("Wallet / Payment") { walletDialog() })
         root.addView(card().apply { addView(actions) }, margin())
 
-        root.addView(TextView(this).apply {
-            text = "Loading chatrooms…"
-            setPadding(dp(4),dp(12),dp(4),dp(12))
-        })
+        roomsBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        root.addView(roomsBox)
         loadRooms()
     }
 
     private fun loadRooms() {
+        val box = roomsBox ?: return
+        box.removeAllViews()
+        box.addView(TextView(this).apply { text = "Loading chatrooms…"; setPadding(dp(6),dp(10),dp(6),dp(10)) })
         net({ api.get("chat_rooms") }) { j ->
-            while (root.childCount > 3) root.removeViewAt(3)
+            box.removeAllViews()
             val rooms = j.optJSONArray("rooms") ?: JSONArray()
             if (rooms.length() == 0) {
-                root.addView(TextView(this).apply {
+                box.addView(TextView(this).apply {
                     text = "No chatrooms yet. Admin can create Driver / Township / Custom rooms. Booking rooms are created automatically."
                     setPadding(dp(6),dp(12),dp(6),dp(12))
                 })
@@ -170,8 +208,8 @@ class CommunicationActivity : ComponentActivity() {
             }
             for (i in 0 until rooms.length()) {
                 val r = rooms.getJSONObject(i)
-                val unread = r.optInt("last_message_id") - r.optInt("last_read_message_id")
-                root.addView(card().apply {
+                val unread = maxOf(0, r.optInt("last_message_id") - r.optInt("last_read_message_id"))
+                box.addView(card().apply {
                     addView(TextView(this@CommunicationActivity).apply {
                         text = r.optString("name")
                         textSize = 17f
@@ -193,24 +231,56 @@ class CommunicationActivity : ComponentActivity() {
 
     private fun openRoom(roomId: Int, roomName: String) {
         selectedRoomId = roomId
+        activeRoomId = roomId
+        lastMessageId = 0
+        chatHandler.removeCallbacks(chatPoll)
         root.removeAllViews()
         root.addView(header("CHAT ROOM", roomName))
+        networkBadge = TextView(this).apply {
+            text = if (liteMode) "● Lite Mode" else "● Standard Mode"
+            textSize = 12f
+            setTextColor(Color.parseColor("#5F7488"))
+        }
+        root.addView(networkBadge)
         root.addView(button("← Chatrooms") { showRooms() })
+
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        activeMessageList = list
+
         root.addView(card().apply {
-            addView(button("Refresh Messages") { loadMessages(roomId, list) })
+            addView(button("Refresh Messages") { loadMessages(roomId, list, true) })
+
+            val quick = LinearLayout(this@CommunicationActivity).apply { orientation = LinearLayout.HORIZONTAL }
+            quick.addView(button("I'm here") { sendText(roomId, "I’m here.", list) }, LinearLayout.LayoutParams(0,-2,1f))
+            quick.addView(button("Wait 5 min") { sendText(roomId, "Please wait 5 minutes.", list) }, LinearLayout.LayoutParams(0,-2,1f))
+            quick.addView(button("OK") { sendText(roomId, "OK", list) }, LinearLayout.LayoutParams(0,-2,1f))
+            addView(quick)
+
             val row = LinearLayout(this@CommunicationActivity).apply { orientation = LinearLayout.HORIZONTAL }
             row.addView(button("📷 Photo") { photoPicker.launch("image/*") }, LinearLayout.LayoutParams(0,-2,1f))
             row.addView(button("📍 Location") { requestLocationFor(roomId) }, LinearLayout.LayoutParams(0,-2,1f))
             addView(row)
+
             val mediaRow = LinearLayout(this@CommunicationActivity).apply { orientation = LinearLayout.HORIZONTAL }
-            val voice = button("🎙 Start Voice") { toggleVoice(roomId) }
+            val voice = button("🎙 Voice") { toggleVoice(roomId) }
             recordButton = voice
             mediaRow.addView(voice, LinearLayout.LayoutParams(0,-2,1f))
             mediaRow.addView(button("📞 Audio") { startCall(roomId, "audio") }, LinearLayout.LayoutParams(0,-2,1f))
-            mediaRow.addView(button("🎥 Video") { startCall(roomId, "video") }, LinearLayout.LayoutParams(0,-2,1f))
+            mediaRow.addView(button("🎥 Video") {
+                if (liteMode) {
+                    AlertDialog.Builder(this@CommunicationActivity)
+                        .setTitle("Video uses more data")
+                        .setMessage("Lite Mode is ON. Start video call anyway?")
+                        .setPositiveButton("Start") { _,_ -> startCall(roomId, "video") }
+                        .setNegativeButton("Cancel", null).show()
+                } else startCall(roomId, "video")
+            }, LinearLayout.LayoutParams(0,-2,1f))
             addView(mediaRow)
+
+            val pending = pendingText(roomId)
+            if (pending.isNotBlank()) addView(button("Retry pending message") { retryPending(roomId, list) })
         }, margin())
+
         root.addView(list, margin())
 
         val entry = EditText(this).apply {
@@ -224,23 +294,29 @@ class CommunicationActivity : ComponentActivity() {
             addView(button("Send Message") {
                 val t = entry.text.toString().trim()
                 if (t.isNotBlank()) {
-                    net({ api.post("chat_send", JSONObject().put("room_id",roomId).put("message_type","text").put("message_text",t)) }) {
-                        entry.text.clear(); loadMessages(roomId,list)
-                    }
+                    entry.text.clear()
+                    sendText(roomId, t, list)
                 }
             })
         }, margin())
-        loadMessages(roomId, list)
+
+        loadMessages(roomId, list, true)
+        chatHandler.postDelayed(chatPoll, if (liteMode) 12000 else 6000)
     }
 
-    private fun loadMessages(roomId:Int, list:LinearLayout) {
-        net({ api.get("chat_messages", mapOf("room_id" to roomId.toString())) }) { j ->
-            list.removeAllViews()
+    private fun loadMessages(roomId:Int, list:LinearLayout, reset:Boolean=false) {
+        val after = if (reset) 0 else lastMessageId
+        val limit = if (liteMode) 40 else 80
+        net({ api.get("chat_messages", mapOf("room_id" to roomId.toString(), "after_id" to after.toString(), "limit" to limit.toString())) }) { j ->
+            if (reset) {
+                list.removeAllViews()
+                lastMessageId = 0
+            }
             val a = j.optJSONArray("messages") ?: JSONArray()
-            var last = 0
+            var newest = lastMessageId
             for (i in 0 until a.length()) {
                 val m = a.getJSONObject(i)
-                last = maxOf(last, m.optInt("id"))
+                newest = maxOf(newest, m.optInt("id"))
                 val own = m.optString("sender_type") == role
                 val c = card()
                 c.setPadding(dp(12),dp(9),dp(12),dp(9))
@@ -264,12 +340,52 @@ class CommunicationActivity : ComponentActivity() {
                 })
                 if (own) c.addView(TextView(this).apply {
                     text = "Delivered: " + m.optInt("delivered_count") + " • Read: " + m.optInt("read_count")
-                    textSize = 11f; setTextColor(Color.parseColor("#4B7D74"))
+                    textSize = 11f
+                    setTextColor(Color.parseColor("#4B7D74"))
                 })
                 list.addView(c, margin())
             }
-            if (last > 0) net({ api.post("chat_mark_read", JSONObject().put("room_id",roomId).put("message_id",last)) }) { }
+            lastMessageId = newest
+            if (newest > 0) net({ api.post("chat_mark_read", JSONObject().put("room_id",roomId).put("message_id",newest)) }) { }
         }
+    }
+
+    private val chatPoll = object : Runnable {
+        override fun run() {
+            val rid = activeRoomId
+            val box = activeMessageList
+            if (rid > 0 && box != null) {
+                loadMessages(rid, box, false)
+                chatHandler.postDelayed(this, if (liteMode) 12000 else 6000)
+            }
+        }
+    }
+
+    private fun sendText(roomId:Int, text:String, list:LinearLayout) {
+        thread {
+            val started = SystemClock.elapsedRealtime()
+            val r = runCatching {
+                api.post("chat_send", JSONObject().put("room_id",roomId).put("message_type","text").put("message_text",text))
+            }.getOrElse { JSONObject().put("ok",false).put("error",it.message?:"Network error") }
+            val ms = SystemClock.elapsedRealtime() - started
+            runOnUiThread {
+                updateNetworkBadge(ms, r.optBoolean("ok"))
+                if (r.optBoolean("ok")) {
+                    clearPending(roomId)
+                    loadMessages(roomId, list, false)
+                } else {
+                    litePrefs.edit().putString("pending_text_" + roomId, text).apply()
+                    toast("Network problem. Message saved for retry.")
+                }
+            }
+        }
+    }
+
+    private fun pendingText(roomId:Int)=litePrefs.getString("pending_text_" + roomId, "").orEmpty()
+    private fun clearPending(roomId:Int)=litePrefs.edit().remove("pending_text_" + roomId).apply()
+    private fun retryPending(roomId:Int,list:LinearLayout) {
+        val p=pendingText(roomId)
+        if(p.isNotBlank()) sendText(roomId,p,list)
     }
 
     private fun toggleVoice(roomId:Int) {
@@ -295,8 +411,8 @@ class CommunicationActivity : ComponentActivity() {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                setAudioEncodingBitRate(96000)
-                setAudioSamplingRate(44100)
+                setAudioEncodingBitRate(if(liteMode)64000 else 96000)
+                setAudioSamplingRate(if(liteMode)32000 else 44100)
                 setOutputFile(f.absolutePath)
                 prepare()
                 start()
@@ -320,17 +436,31 @@ class CommunicationActivity : ComponentActivity() {
     private fun uploadUri(uri:Uri, roomId:Int, kind:String) {
         thread {
             try {
-                val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@thread
                 val mime = contentResolver.getType(uri) ?: "application/octet-stream"
-                val ext = when {
-                    mime.contains("png") -> "png"
-                    mime.contains("webp") -> "webp"
-                    mime.contains("jpeg") || mime.contains("jpg") -> "jpg"
-                    else -> "bin"
+                if (mime.startsWith("image/")) {
+                    val prepared = prepareImage(uri)
+                    uploadBytes(prepared.first, "photo_" + System.currentTimeMillis() + ".jpg", "image/jpeg", roomId, kind)
+                } else {
+                    val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@thread
+                    uploadBytes(bytes, "upload_" + System.currentTimeMillis() + ".bin", mime, roomId, kind)
                 }
-                uploadBytes(bytes, "photo_" + System.currentTimeMillis() + "." + ext, mime, roomId, kind)
             } catch(e:Exception) { runOnUiThread { toast("Photo upload error: " + e.message) } }
         }
+    }
+
+    private fun prepareImage(uri:Uri):Pair<ByteArray,String> {
+        val bounds=BitmapFactory.Options().apply{inJustDecodeBounds=true}
+        contentResolver.openInputStream(uri)?.use{BitmapFactory.decodeStream(it,null,bounds)}
+        val maxSide=if(liteMode)1280 else 1920
+        var sample=1
+        while(maxOf(bounds.outWidth,bounds.outHeight)/sample>maxSide) sample*=2
+        val opts=BitmapFactory.Options().apply{inSampleSize=maxOf(1,sample)}
+        val bmp=contentResolver.openInputStream(uri)?.use{BitmapFactory.decodeStream(it,null,opts)}
+            ?: throw IllegalArgumentException("Cannot decode image")
+        val out=ByteArrayOutputStream()
+        bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, if(liteMode)68 else 82, out)
+        bmp.recycle()
+        return out.toByteArray() to "image/jpeg"
     }
 
     private fun uploadFile(file:File, roomId:Int, kind:String, mime:String) {
@@ -440,9 +570,25 @@ class CommunicationActivity : ComponentActivity() {
 
     private fun net(fn:()->JSONObject,done:(JSONObject)->Unit) {
         thread {
+            val started=SystemClock.elapsedRealtime()
             val r=runCatching(fn).getOrElse { JSONObject().put("ok",false).put("error",it.message?:"Network error") }
-            runOnUiThread { if(r.optBoolean("ok"))done(r) else toast(r.optString("error","Request failed")) }
+            val ms=SystemClock.elapsedRealtime()-started
+            runOnUiThread {
+                updateNetworkBadge(ms,r.optBoolean("ok"))
+                if(r.optBoolean("ok"))done(r) else toast(r.optString("error","Request failed"))
+            }
         }
+    }
+
+    private fun updateNetworkBadge(ms:Long, ok:Boolean) {
+        val label = when {
+            !ok -> "● Offline / Retry"
+            ms < 700 -> "● Network Fast • " + ms + "ms"
+            ms < 1800 -> "● Network Normal • " + ms + "ms"
+            else -> "● Network Slow • " + ms + "ms"
+        }
+        networkBadge?.text = (if(liteMode) "Lite • " else "") + label
+        networkBadge?.setTextColor(Color.parseColor(if(ok) "#4D776E" else "#A33A32"))
     }
 
     private fun netToast(fn:()->JSONObject) { net(fn){toast("Success")} }
