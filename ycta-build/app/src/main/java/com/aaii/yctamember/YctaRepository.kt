@@ -107,7 +107,14 @@ class YctaRepository(cacheDir: File) {
 
     fun fetchBestImage(urls: List<String>, referer: String): ByteArray? {
         for (url in urls.distinct()) {
-            fetchImage(url, referer)?.let { return it }
+            val bytes = fetchImage(url, referer) ?: continue
+            // A server may respond HTTP 200 with a login HTML page, or
+            // an image CDN may return a corrupt/unsupported image.
+            // Validate bytes before accepting; then try the next URL.
+            if (android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) != null) {
+                return bytes
+            }
+            runCatching { imageCacheFile(url).delete() }
         }
         return null
     }
