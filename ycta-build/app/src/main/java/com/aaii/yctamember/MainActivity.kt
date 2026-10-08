@@ -77,9 +77,23 @@ class MainActivity : ComponentActivity() {
             addView(root)
         })
 
-        intent?.getStringExtra("member_profile_url")
-            ?.takeIf { it.isNotBlank() }
-            ?.let { memberUrl -> doSearch(memberUrl) }
+        val apiMemberId = intent?.getLongExtra("mobile_api_member_id", -1L) ?: -1L
+        if (apiMemberId > 0L) {
+            loading(true)
+            status.text = "Loading SQL member profile…"
+            lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching { YctaMobileApi().member(apiMemberId).asMember() }
+                }
+                result.onSuccess(::openSmartCard)
+                    .onFailure { status.text = "Mobile API profile error: ${it.message}" }
+                loading(false)
+            }
+        } else {
+            intent?.getStringExtra("member_profile_url")
+                ?.takeIf { it.isNotBlank() }
+                ?.let { memberUrl -> doSearch(memberUrl) }
+        }
     }
 
     private fun buildSearchArea(): LinearLayout {
