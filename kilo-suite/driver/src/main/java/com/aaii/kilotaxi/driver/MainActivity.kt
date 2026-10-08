@@ -139,10 +139,14 @@ class MainActivity : ComponentActivity() {
         page.addView(card().apply {
             addView(section("ACTIVATION CODE"))
             addView(code)
+            addView(caption("Format: YCTA-XXXX-XXXX-XXXX • spaces/smart dashes are cleaned automatically"))
             addView(primaryButton("Activate & Continue") {
-                val v = code.text.toString().trim()
+                val v = normalizeActivationCode(code.text.toString())
+                code.setText(v)
                 if (v.isBlank()) {
                     toast("Activation code is required.")
+                } else if (!v.matches(Regex("^YCTA-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$"))) {
+                    toast("Activation code format must be YCTA-XXXX-XXXX-XXXX")
                 } else {
                     call({ api.post("activate", JSONObject().put("activation_code", v)) }) { j ->
                         val token = j.optString("token")
@@ -215,7 +219,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun renderHome() {
-        page.addView(appHeader("DRIVER", "KILO TAXI • Native V6.2"))
+        page.addView(appHeader("DRIVER", "KILO TAXI • Native V6.2.1"))
 
         val onlineNow = prefs.getBoolean("online", false)
         val statusCard = card().apply {
@@ -673,6 +677,26 @@ class MainActivity : ComponentActivity() {
         })
     }
 
+    private fun normalizeActivationCode(raw: String): String {
+        var s = raw.trim().uppercase(Locale.US)
+        s = s
+            .replace('–','-')
+            .replace('—','-')
+            .replace('−','-')
+            .replace('‐','-')
+            .replace('‑','-')
+            .replace('﹘','-')
+            .replace('﹣','-')
+            .replace('－','-')
+        s = s.replace(Regex("[\\s\\u00A0\\u200B\\u200C\\u200D\\u2060\\uFEFF]+"), "")
+        val compact = s.replace("-", "")
+        if (compact.matches(Regex("^YCTA[0-9A-F]{12}$"))) {
+            val x = compact.substring(4)
+            return "YCTA-" + x.substring(0,4) + "-" + x.substring(4,8) + "-" + x.substring(8,12)
+        }
+        return s
+    }
+
     private fun migrateOldApi() {
         val saved = prefs.getString("api", "").orEmpty().trim()
         if (saved.isBlank() || saved == OLD_API) {
@@ -714,6 +738,14 @@ class MainActivity : ComponentActivity() {
             "OTP_LOCKED" -> "OTP is locked. Contact Call Center."
             "MEMBERSHIP_EXPIRED" -> "Membership expired. Please renew."
             "ACTIVE_TRIP_CANNOT_GO_OFFLINE" -> "Complete or reject the active job before going offline."
+            "CODE_REQUIRED" -> "Enter your YCTA activation code."
+            "CODE_FORMAT_INVALID" -> "Activation code format must be YCTA-XXXX-XXXX-XXXX."
+            "INVALID_CODE" -> "Activation code was not found. Check the code or generate a new one in Admin."
+            "INVALID_OR_USED_CODE" -> "Activation code is invalid or already used. Generate a new code if needed."
+            "CODE_ALREADY_USED" -> "This activation code was already used. Generate a new code for this phone."
+            "CODE_REVOKED" -> "This activation code was revoked. Generate a new code in Admin."
+            "CODE_EXPIRED" -> "This activation code expired. Generate a new code in Admin."
+            "MEMBERSHIP_SUSPENDED" -> "This membership is suspended. Admin must reactivate the member first."
             else -> error.replace("_", " ")
         }
     }
