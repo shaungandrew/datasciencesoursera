@@ -71,10 +71,16 @@ class MoocApi(private val context: Context) {
             error("Enter Activation Code OR Username + Password.")
         }
 
+        // Match the AAII Panyar Home native APK login contract.
         val data = JSONObject()
-        if (activation.isNotBlank()) data.put("activation_code", activation)
-        if (username.isNotBlank()) data.put("username", username)
-        if (password.isNotBlank()) data.put("password", password)
+        if (activation.isNotBlank()) {
+            data.put("mode", "activation")
+            data.put("activation_code", activation.trim())
+        } else {
+            data.put("mode", "password")
+            data.put("identifier", username.trim())
+            data.put("password", password)
+        }
         data.put("device_id", deviceId())
         data.put("device_label", deviceLabel())
         val request = Request.Builder()
@@ -82,12 +88,13 @@ class MoocApi(private val context: Context) {
             .post(data.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .header("Accept", "application/json")
             .header("Referer", WEB_BASE)
-            .header("User-Agent", "YCTA-MOOC-Native/6.1 Android")
+            .header("X-Device-ID", deviceId())
+            .header("User-Agent", "YCTA-MOOC-Native/6.2 Android")
             .build()
         val text = execute(request)
         val obj = parseObject(text)
-        val found = findString(obj, listOf("token", "access_token", "api_token"))
-        if (found.isBlank()) {
+        val found = findString(obj, listOf("token", "access_token", "api_token")).trim()
+        if (!obj.optBoolean("ok", true) || found.isBlank()) {
             val msg = findString(obj, listOf("message", "error", "detail"))
             error(if (msg.isBlank()) "Login succeeded but token was not returned." else msg)
         }
@@ -263,7 +270,8 @@ class MoocApi(private val context: Context) {
             .url(url)
             .header("Accept", "application/json,*/*")
             .header("Referer", WEB_BASE)
-            .header("User-Agent", "YCTA-MOOC-Native/6.0 Android")
+            .header("User-Agent", "YCTA-MOOC-Native/6.2 Android")
+            .header("X-Device-ID", deviceId())
         val t = token()
         if (t.isNotBlank()) {
             b.header("Authorization", "Bearer $t")
@@ -282,9 +290,12 @@ class MoocApi(private val context: Context) {
                 text.contains("invalid token", true)
             ) {
                 if (!request.url.encodedPath.endsWith("/login.php")) clearToken()
+                val message = runCatching {
+                    findString(parseObject(text), listOf("message", "error", "detail"))
+                }.getOrDefault("")
                 throw AuthException(
                     if (request.url.encodedPath.endsWith("/login.php"))
-                        "Login rejected. Please check your credentials."
+                        message.ifBlank { "Login rejected. Please check your Activation Code or Password." }
                     else "MOOC session expired. Log in again."
                 )
             }
