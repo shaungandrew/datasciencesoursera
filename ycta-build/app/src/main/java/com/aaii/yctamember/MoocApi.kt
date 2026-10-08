@@ -11,10 +11,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 import java.util.UUID
+import java.net.UnknownHostException
 
 class MoocApi(private val context: Context) {
     companion object {
-        const val WEB_BASE = "https://www.aaii.asia/edu/mooc/"
+        const val WEB_BASE = "https://aaii.asia/edu/mooc/"
         const val API_BASE = "https://aaii.asia/edu/mooc/api/"
         private const val PREFS = "ycta_mooc_module"
         private const val TOKEN = "token"
@@ -46,6 +47,35 @@ class MoocApi(private val context: Context) {
     private val sessionCookies = MoocSessionCookieJar()
     private val client = OkHttpClient.Builder()
         .cookieJar(sessionCookies)
+        .addInterceptor { chain ->
+            val original = chain.request()
+            try {
+                chain.proceed(original)
+            } catch (e: UnknownHostException) {
+                // Retry only the two known first-party hosts. Never forward
+                // credentials to an arbitrary redirect or third-party URL.
+                val alternateHost = when (original.url.host.lowercase()) {
+                    "aaii.asia" -> "www.aaii.asia"
+                    "www.aaii.asia" -> "aaii.asia"
+                    else -> throw e
+                }
+                val retry = original.newBuilder()
+                    .url(original.url.newBuilder().host(alternateHost).build())
+                    .header("Referer", "https://$alternateHost/edu/mooc/")
+                    .build()
+                try {
+                    chain.proceed(retry)
+                } catch (retryError: UnknownHostException) {
+                    val failure = UnknownHostException(
+                        "MOOC DNS problem: neither aaii.asia nor www.aaii.asia " +
+                        "could be resolved by your network. Open the website in Chrome " +
+                        "or change your phone's DNS/network and retry."
+                    )
+                    failure.initCause(retryError)
+                    throw failure
+                }
+            }
+        }
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(35, TimeUnit.SECONDS)
         .followRedirects(true)
@@ -72,7 +102,7 @@ class MoocApi(private val context: Context) {
         val id = deviceId()
         return "Device ID saved UUID (" + id.length + " characters); " +
             "JSON & X-Device-ID: enabled; Cookies: enabled; " +
-            "API host: aaii.asia"
+            "MOOC host: aaii.asia (fallback: www.aaii.asia)"
     }
 
     private fun deviceLabel(): String =
@@ -110,7 +140,7 @@ class MoocApi(private val context: Context) {
             .header("Accept", "application/json")
             .header("Referer", WEB_BASE)
             .header("X-Device-ID", deviceId())
-            .header("User-Agent", "YCTA-MOOC-Native/6.4 Android")
+            .header("User-Agent", "YCTA-MOOC-Native/6.6 Android")
             .build()
         val text = execute(request)
         val obj = parseObject(text)
@@ -131,7 +161,7 @@ class MoocApi(private val context: Context) {
                 .get()
                 .header("Accept", "text/html,application/xhtml+xml,*/*")
                 .header("X-Device-ID", device)
-                .header("User-Agent", "YCTA-MOOC-Native/6.4 Android")
+                .header("User-Agent", "YCTA-MOOC-Native/6.6 Android")
                 .build()
             client.newCall(request).execute().use { response ->
                 response.body?.close()
@@ -337,7 +367,7 @@ class MoocApi(private val context: Context) {
             .url(url)
             .header("Accept", "application/json,*/*")
             .header("Referer", WEB_BASE)
-            .header("User-Agent", "YCTA-MOOC-Native/6.4 Android")
+            .header("User-Agent", "YCTA-MOOC-Native/6.6 Android")
             .header("X-Device-ID", deviceId())
         val t = token()
         if (t.isNotBlank()) {
