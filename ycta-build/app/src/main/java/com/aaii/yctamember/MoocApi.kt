@@ -100,6 +100,7 @@ class MoocApi(private val context: Context) {
             val cached = cachedCourses(source)
             if (cached.isNotEmpty()) return cached
         }
+        if (!hasToken()) throw AuthException("MOOC login or activation required.")
 
         var lastError: Throwable? = null
         for (relative in candidates(source)) {
@@ -252,6 +253,7 @@ class MoocApi(private val context: Context) {
         }
 
     private fun get(relative: String): String {
+        if (!hasToken()) throw AuthException("MOOC login or activation required.")
         val url = if (relative.startsWith("http")) relative else API_BASE + relative
         return execute(authBuilder(url).get().build())
     }
@@ -279,7 +281,12 @@ class MoocApi(private val context: Context) {
                 text.contains("LOGIN_REQUIRED", true) ||
                 text.contains("invalid token", true)
             ) {
-                throw AuthException("MOOC login / activation is required.")
+                if (!request.url.encodedPath.endsWith("/login.php")) clearToken()
+                throw AuthException(
+                    if (request.url.encodedPath.endsWith("/login.php"))
+                        "Login rejected. Please check your credentials."
+                    else "MOOC session expired. Log in again."
+                )
             }
             if (!response.isSuccessful) {
                 val message = runCatching {
