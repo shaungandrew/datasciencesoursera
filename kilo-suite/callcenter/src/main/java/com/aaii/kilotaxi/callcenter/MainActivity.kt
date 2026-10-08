@@ -31,7 +31,7 @@ class MainActivity:ComponentActivity(){
 
     private fun home(){
         map?.onDetach();map=null;root.removeAllViews()
-        root.addView(head("KILO TAXI","CALL CENTER V5"))
+        root.addView(head("KILO TAXI","CALL CENTER V6 LITE"))
         root.addView(card().apply{
             addView(TextView(this@MainActivity).apply{text="09 252 569 54";textSize=27f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#0B6C81"))})
             addView(TextView(this@MainActivity).apply{text="Township booking • Live drivers • Auto dispatch • OTP • Fare tracking"})
@@ -45,11 +45,24 @@ class MainActivity:ComponentActivity(){
         },margin())
 
         val district=Spinner(this).apply{adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_dropdown_item,districts)}
-        val mv=MapView(this).apply{setMultiTouchControls(true);controller.setZoom(11.5);controller.setCenter(GeoPoint(16.8409,96.1735))}
+        val mv=MapView(this).apply{
+            setMultiTouchControls(true);controller.setZoom(11.5);controller.setCenter(GeoPoint(16.8409,96.1735))
+            visibility=if(prefs.getBoolean("lite_mode",true)) android.view.View.GONE else android.view.View.VISIBLE
+        }
         map=mv
         root.addView(card().apply{
-            addView(section("LIVE DRIVER GPS MAP"));addView(district);addView(mv,LinearLayout.LayoutParams(-1,dp(330)))
-            addView(Button(this@MainActivity).apply{text="Refresh Drivers";isAllCaps=false;setOnClickListener{loadMap(mv,district.selectedItem.toString())}})
+            addView(section("LIVE DRIVER GPS MAP"))
+            addView(Switch(this@MainActivity).apply{
+                text="Lite Mode — map only when needed"
+                isChecked=prefs.getBoolean("lite_mode",true)
+                setOnCheckedChangeListener{_,checked->
+                    prefs.edit().putBoolean("lite_mode",checked).apply()
+                    mv.visibility=if(checked) android.view.View.GONE else android.view.View.VISIBLE
+                }
+            })
+            addView(district);addView(mv,LinearLayout.LayoutParams(-1,dp(330)))
+            addView(Button(this@MainActivity).apply{text="Show / Hide Map";isAllCaps=false;setOnClickListener{mv.visibility=if(mv.visibility==android.view.View.VISIBLE)android.view.View.GONE else android.view.View.VISIBLE}})
+            addView(Button(this@MainActivity).apply{text="Refresh Drivers";isAllCaps=false;setOnClickListener{mv.visibility=android.view.View.VISIBLE;loadMap(mv,district.selectedItem.toString())}})
         },margin())
 
         val name=edit("Passenger Name");val phone=edit("Passenger Phone");val pickup=edit("Pickup / Landmark");val plat=edit("Pickup Latitude");val plng=edit("Pickup Longitude");val dest=edit("Destination");val dlat=edit("Destination Latitude (optional)");val dlng=edit("Destination Longitude (optional)");val notes=edit("Notes");val out=TextView(this)
@@ -66,9 +79,18 @@ class MainActivity:ComponentActivity(){
         },margin())
 
         val box=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+        val statusFilter=Spinner(this).apply{
+            adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_dropdown_item,listOf("ALL","WAITING","ASSIGNED","ACCEPTED","PICKUP","STARTED","COMPLETED","CANCELLED"))
+        }
         root.addView(card().apply{
-            addView(section("BOOKING STATUS"))
-            addView(Button(this@MainActivity).apply{text="Load Bookings";isAllCaps=false;setOnClickListener{call({api.get("operator_bookings",mapOf("district" to district.selectedItem.toString()),tok())}){renderBookings(box,it.optJSONArray("bookings")?:JSONArray())}}})
+            addView(section("BOOKING QUICK FILTER"))
+            addView(statusFilter)
+            addView(Button(this@MainActivity).apply{text="Load Filtered Bookings";isAllCaps=false;setOnClickListener{
+                val params=mutableMapOf("district" to district.selectedItem.toString(),"limit" to "100")
+                val st=statusFilter.selectedItem.toString()
+                if(st!="ALL")params["status"]=st
+                call({api.get("operator_bookings",params,tok())}){renderBookings(box,it.optJSONArray("bookings")?:JSONArray())}
+            }})
             addView(box)
         },margin())
     }
