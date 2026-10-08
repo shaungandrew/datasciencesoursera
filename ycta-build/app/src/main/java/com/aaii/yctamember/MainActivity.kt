@@ -79,18 +79,24 @@ class MainActivity : ComponentActivity() {
         root.addView(searchArea)
         root.addView(profileArea)
 
-        setContentView(ScrollView(this).apply {
+        val screenScroll = ScrollView(this).apply {
             isFillViewport = true
+            clipToPadding = false
             addView(root)
-        })
-        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
-            val top = insets.getInsets(WindowInsetsCompat.Type.statusBars())
-            val bottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
-            view.setPadding(dp(14) + top.left, dp(14) + top.top,
-                dp(14) + top.right, dp(28) + bottom.bottom)
+        }
+        setContentView(screenScroll)
+        // Apply system-bar safe area to the outer scroll surface so the
+        // Search / Sync controls and Smart Card footer never overlap OS bars.
+        ViewCompat.setOnApplyWindowInsetsListener(screenScroll) { view, insets ->
+            val statusInset = insets.getInsets(WindowInsetsCompat.Type.statusBars())
+            val navInset = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            view.setPadding(statusInset.left,
+                maxOf(dp(24), statusInset.top),
+                statusInset.right,
+                maxOf(dp(24), navInset.bottom))
             insets
         }
-        ViewCompat.requestApplyInsets(root)
+        ViewCompat.requestApplyInsets(screenScroll)
         refreshHomeCounts()
 
         val apiMemberId = intent?.getLongExtra("mobile_api_member_id", -1L) ?: -1L
@@ -694,6 +700,18 @@ class MainActivity : ComponentActivity() {
         }
         addSmartRow(dataPanel, "District / Township", display(m.district))
         card.addView(dataPanel)
+        if (listOf(m.driverLicense, m.joinedDate, m.vehicleNo, m.cityNo).all { it.isBlank() }) {
+            card.addView(TextView(this).apply {
+                text = if (m.apiVersion == "unknown" || m.apiVersion.isBlank()) {
+                    "Profile details not returned by the server. Upload Mobile API V1.7 on ycta.aaii.asia."
+                } else {
+                    "No license / joined date / vehicle details were returned for this member by API v${m.apiVersion}. Verify the live kt_members source row."
+                }
+                textSize = 12f
+                setTextColor(Color.parseColor("#FFDA87"))
+                setPadding(0, dp(10), 0, dp(4))
+            })
+        }
 
         card.addView(divider())
 
@@ -730,7 +748,8 @@ class MainActivity : ComponentActivity() {
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
 
         card.addView(TextView(this).apply {
-            text = "QR ID • Tap QR to enlarge   |   Photo cache enabled   |   Synced " + syncTime()
+            text = "API " + (m.apiVersion.ifBlank { "legacy" }) +
+                " • QR ID • Photo fallback • Synced " + syncTime()
             textSize = 10.5f
             setTextColor(Color.parseColor("#B9DEEF"))
             setPadding(0, dp(12), 0, 0)
@@ -751,7 +770,7 @@ class MainActivity : ComponentActivity() {
             setTextColor(Color.parseColor("#1F659A"))
         })
         helper.addView(TextView(this).apply {
-            text = "• SQL API V1.6 member details\n• QR Scan → opens member card\n• Photo fallback and local cache\n• Sync refreshes the active SQL member\n• Driver license masked for privacy\n• Long-press Member ID to copy"
+            text = "• Live SQL Mobile API version shown on card\n• QR Scan → opens member card\n• Photo fallback and local cache\n• Sync refreshes the active SQL member\n• Driver license masked for privacy\n• Long-press Member ID to copy"
             textSize = 14f
             setTextColor(Color.parseColor("#40586D"))
             setPadding(0, dp(8), 0, 0)
