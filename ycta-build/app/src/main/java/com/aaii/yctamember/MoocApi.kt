@@ -4,6 +4,8 @@ import android.content.Context
 import android.os.Build
 import android.provider.Settings
 import okhttp3.FormBody
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
@@ -69,23 +71,20 @@ class MoocApi(private val context: Context) {
             error("Enter Activation Code OR Username + Password.")
         }
 
-        val body = FormBody.Builder().apply {
-            if (activation.isNotBlank()) add("activation_code", activation)
-            if (username.isNotBlank()) add("username", username)
-            if (password.isNotBlank()) add("password", password)
-            add("device_id", deviceId())
-            add("device_label", deviceLabel())
-        }.build()
-
-        val req = Request.Builder()
+        val data = JSONObject()
+        if (activation.isNotBlank()) data.put("activation_code", activation)
+        if (username.isNotBlank()) data.put("username", username)
+        if (password.isNotBlank()) data.put("password", password)
+        data.put("device_id", deviceId())
+        data.put("device_label", deviceLabel())
+        val request = Request.Builder()
             .url(API_BASE + "login.php")
-            .post(body)
+            .post(data.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .header("Accept", "application/json")
             .header("Referer", WEB_BASE)
-            .header("User-Agent", "YCTA-MOOC-Native/6.0 Android")
+            .header("User-Agent", "YCTA-MOOC-Native/6.1 Android")
             .build()
-
-        val text = execute(req)
+        val text = execute(request)
         val obj = parseObject(text)
         val found = findString(obj, listOf("token", "access_token", "api_token"))
         if (found.isBlank()) {
