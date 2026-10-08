@@ -9,8 +9,8 @@ android {
         applicationId = "com.aaii.yctamember"
         minSdk = 24
         targetSdk = 35
-        versionCode = 16
-        versionName = "6.8.0"
+        versionCode = 17
+        versionName = "6.9.0"
     }
     buildTypes { release { isMinifyEnabled = false } }
     compileOptions {
