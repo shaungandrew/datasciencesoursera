@@ -1,9 +1,9 @@
-name: YCTA APK Build V6.8 District Township Members
+name: YCTA APK Build V6.9 Official Logo
 
 on:
   push:
     branches:
-      - 'chatgpt-ycta-v68-district-township-members-*'
+      - 'chatgpt-ycta-v69-logo-branding-*'
 
 permissions:
   contents: read
@@ -20,14 +20,36 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build APK
+      - name: Prepare Android logo resource
+        run: |
+          mkdir -p ycta-build/app/src/main/res/drawable-nodpi
+          python3 - <<'PY'
+          import base64
+          # Valid one-pixel PNG placeholder. Official user-provided full-resolution
+          # logo is substituted after APK compilation and before signing.
+          encoded = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLttAAAAABJRU5ErkJggg=="
+          with open("ycta-build/app/src/main/res/drawable-nodpi/ycta_logo.png", "wb") as f:
+              f.write(base64.b64decode(encoded))
+          PY
+      - name: Build unsigned-ready native APK
         run: |
           cd ycta-build
           gradle --no-daemon :app:assembleDebug --stacktrace
-          cp app/build/outputs/apk/debug/app-debug.apk ../YCTA_Member_Native_V6_8_14District_44Township.apk
-      - name: Upload APK
+          cp app/build/outputs/apk/debug/app-debug.apk ../YCTA_Member_Native_V6_9_OfficialLogo_PreBrand.apk
+      - name: Bundle APK packaging tools
+        run: |
+          mkdir -p android-tools
+          find "$ANDROID_HOME/build-tools" -type f -name apksigner.jar -print -quit | xargs -r -I '{}' cp '{}' android-tools/apksigner.jar
+          find "$ANDROID_HOME/build-tools" -type f -name zipalign -print -quit | xargs -r -I '{}' cp '{}' android-tools/zipalign
+          test -s android-tools/apksigner.jar
+          test -s android-tools/zipalign
+          chmod +x android-tools/zipalign
+      - name: Upload APK and packaging tools
         uses: actions/upload-artifact@v4
         with:
-          name: YCTA_Member_Native_V6_8_14District_44Township_APK
-          path: YCTA_Member_Native_V6_8_14District_44Township.apk
+          name: YCTA_Member_Native_V6_9_OfficialLogo_BuildBundle
+          path: |
+            YCTA_Member_Native_V6_9_OfficialLogo_PreBrand.apk
+            android-tools/apksigner.jar
+            android-tools/zipalign
           if-no-files-found: error
