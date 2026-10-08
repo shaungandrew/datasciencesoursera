@@ -74,6 +74,30 @@ class YctaMobileApi {
         }
         return Page(j.optInt("total"),j.optInt("page",page),j.optBoolean("has_more"),j.optString("note"),items)
     }
+    /** Searches the YCTA SQL mirror by member ID, full/partial name or normalized ID. */
+    fun search(query: String, page: Int = 1): Page {
+        require(query.trim().length >= 2) { "Enter at least 2 characters" }
+        val json = get(
+            "action" to "search",
+            "q" to query.trim(),
+            "page" to page.toString()
+        )
+        val arr = json.getJSONArray("members")
+        val found = (0 until arr.length()).map { i ->
+            val r = arr.getJSONObject(i)
+            Row(
+                r.optLong("id"),
+                r.optString("member_code"),
+                r.optString("name"),
+                r.optString("district"),
+                r.optString("township_slug").takeIf { it.isNotBlank() && it != "null" },
+                r.optString("photo_url").takeIf { it.startsWith("https://") }
+            )
+        }
+        return Page(json.optInt("total"), json.optInt("page", page),
+            json.optBoolean("has_more"), json.optString("note"), found)
+    }
+
     fun member(id: Long): Row {
         val r=get("action" to "member","id" to id.toString()).getJSONObject("member")
         return Row(r.optLong("id"),r.optString("member_code"),r.optString("name"),
