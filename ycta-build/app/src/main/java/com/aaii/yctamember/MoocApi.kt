@@ -2,7 +2,6 @@ package com.aaii.yctamember
 
 import android.content.Context
 import android.os.Build
-import android.provider.Settings
 import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -11,6 +10,7 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+import java.util.UUID
 
 class MoocApi(private val context: Context) {
     companion object {
@@ -57,10 +57,23 @@ class MoocApi(private val context: Context) {
 
     private fun token(): String = prefs.getString(TOKEN, "").orEmpty().trim()
 
-    private fun deviceId(): String =
-        Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
-            ?.takeIf { it.isNotBlank() }
-            ?: "android-" + Build.MODEL.replace(" ", "-")
+    // The original Panyar MOOC native APK uses a persisted random UUID.
+    private fun deviceId(): String = synchronized(prefs) {
+        val saved = prefs.getString("mooc_device_uuid", "").orEmpty()
+        if (saved.isNotBlank()) return@synchronized saved
+        val created = UUID.randomUUID().toString()
+        if (!prefs.edit().putString("mooc_device_uuid", created).commit()) {
+            error("Cannot persist MOOC Device ID on this device.")
+        }
+        created
+    }
+
+    fun loginDiagnostics(): String {
+        val id = deviceId()
+        return "Device ID saved UUID (" + id.length + " characters); " +
+            "JSON & X-Device-ID: enabled; Cookies: enabled; " +
+            "API host: aaii.asia"
+    }
 
     private fun deviceLabel(): String =
         listOf(Build.MANUFACTURER, Build.MODEL)
@@ -97,7 +110,7 @@ class MoocApi(private val context: Context) {
             .header("Accept", "application/json")
             .header("Referer", WEB_BASE)
             .header("X-Device-ID", deviceId())
-            .header("User-Agent", "YCTA-MOOC-Native/6.3 Android")
+            .header("User-Agent", "YCTA-MOOC-Native/6.4 Android")
             .build()
         val text = execute(request)
         val obj = parseObject(text)
@@ -118,7 +131,7 @@ class MoocApi(private val context: Context) {
                 .get()
                 .header("Accept", "text/html,application/xhtml+xml,*/*")
                 .header("X-Device-ID", device)
-                .header("User-Agent", "YCTA-MOOC-Native/6.3 Android")
+                .header("User-Agent", "YCTA-MOOC-Native/6.4 Android")
                 .build()
             client.newCall(request).execute().use { response ->
                 response.body?.close()
@@ -296,7 +309,7 @@ class MoocApi(private val context: Context) {
             .url(url)
             .header("Accept", "application/json,*/*")
             .header("Referer", WEB_BASE)
-            .header("User-Agent", "YCTA-MOOC-Native/6.3 Android")
+            .header("User-Agent", "YCTA-MOOC-Native/6.4 Android")
             .header("X-Device-ID", deviceId())
         val t = token()
         if (t.isNotBlank()) {
@@ -328,8 +341,17 @@ class MoocApi(private val context: Context) {
             if (!response.isSuccessful) {
                 val message = runCatching {
                     findString(parseObject(text), listOf("message", "error", "detail"))
-                }.getOrDefault("")
-                error(if (message.isBlank()) "MOOC server HTTP ${response.code}" else message)
+                }.getOrDefault("").ifBlank {
+                    if (text.contains("Device id missing", ignoreCase = true)) {
+                        "Device ID missing (server-side cookie/session validation)"
+                    } else "MOOC server HTTP ${response.code}"
+                }
+                error("$message • HTTP ${response.code} • Host: ${response.request.url.host} • Path: ${response.request.url.encodedPath}")
+            }
+            val contentType = response.header("Content-Type").orEmpty().lowercase()
+            if (request.url.encodedPath.endsWith("/login.php") &&
+                contentType.contains("text/html")) {
+                error("MOOC API returned HTML instead of JSON. Final host: ${response.request.url.host} • Path: ${response.request.url.encodedPath}. Server may be redirecting to a web login page.")
             }
             return text
         }
