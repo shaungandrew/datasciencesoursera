@@ -1,6 +1,8 @@
 package com.aaii.kilotaxi.callcenter
 
+import android.content.Intent
 import android.graphics.Color
+import com.aaii.kilotaxi.common.CommunicationActivity
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -29,7 +31,7 @@ class MainActivity:ComponentActivity(){
 
     private fun home(){
         map?.onDetach();map=null;root.removeAllViews()
-        root.addView(head("KILO TAXI","CALL CENTER V4"))
+        root.addView(head("KILO TAXI","CALL CENTER V5"))
         root.addView(card().apply{
             addView(TextView(this@MainActivity).apply{text="09 252 569 54";textSize=27f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#0B6C81"))})
             addView(TextView(this@MainActivity).apply{text="Township booking • Live drivers • Auto dispatch • OTP • Fare tracking"})
