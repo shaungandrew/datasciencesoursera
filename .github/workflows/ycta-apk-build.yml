@@ -1,9 +1,9 @@
-name: KILO TAXI Lite Smart V6 APKs
+name: KILO TAXI Driver V6.1 Hotfix APK
 
 on:
   push:
     branches:
-      - 'chatgpt-kilotaxi-lite-v6-*'
+      - 'chatgpt-kilotaxi-driver-v6-1-hotfix-*'
 
 permissions:
   contents: read
@@ -20,19 +20,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build V6 Lite role APKs
+      - name: Build Driver V6.1
         run: |
           cd kilo-suite
-          gradle --no-daemon :callcenter:assembleDebug :driver:assembleDebug :passenger:assembleDebug --stacktrace
-          cp callcenter/build/outputs/apk/debug/callcenter-debug.apk ../KILO_TAXI_CallCenter_V6_Lite.apk
-          cp driver/build/outputs/apk/debug/driver-debug.apk ../KILO_TAXI_Driver_V6_Lite.apk
-          cp passenger/build/outputs/apk/debug/passenger-debug.apk ../KILO_TAXI_Passenger_V6_Lite.apk
-      - name: Upload V6 Lite APKs
+          gradle --no-daemon :driver:assembleDebug --stacktrace
+          cp driver/build/outputs/apk/debug/driver-debug.apk ../KILO_TAXI_Driver_V6_1_Lite.apk
+      - name: Upload Driver V6.1 APK
         uses: actions/upload-artifact@v4
         with:
-          name: KILO_TAXI_Lite_Smart_V6_APKs
-          path: |
-            KILO_TAXI_CallCenter_V6_Lite.apk
-            KILO_TAXI_Driver_V6_Lite.apk
-            KILO_TAXI_Passenger_V6_Lite.apk
+          name: KILO_TAXI_Driver_V6_1_Lite_APK
+          path: KILO_TAXI_Driver_V6_1_Lite.apk
           if-no-files-found: error
