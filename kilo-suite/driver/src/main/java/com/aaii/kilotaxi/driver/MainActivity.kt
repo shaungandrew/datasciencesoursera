@@ -55,10 +55,22 @@ class MainActivity:ComponentActivity(){
     private fun driverPanel(token:String){
         val profile=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
         val district=Spinner(this).apply{adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_dropdown_item,districts)}
-        val online=Switch(this).apply{text="Driver Online + Live GPS";isChecked=prefs.getBoolean("online",false)}
+        val online=Switch(this).apply{text="Driver Online + Smart GPS";isChecked=prefs.getBoolean("online",false)}
+        val lite=Switch(this).apply{
+            text="Lite Mode — save battery/data"
+            isChecked=prefs.getBoolean("lite_mode",true)
+            setOnCheckedChangeListener{_,checked->
+                prefs.edit().putBoolean("lite_mode",checked).apply()
+                if(prefs.getBoolean("online",false)){
+                    stopService(Intent(this@MainActivity,DriverLocationService::class.java))
+                    ContextCompat.startForegroundService(this@MainActivity,Intent(this@MainActivity,DriverLocationService::class.java))
+                }
+                toast(if(checked)"Lite Mode ON" else "Standard GPS ON")
+            }
+        }
         root.addView(card().apply{
             addView(section("DRIVER STATUS"))
-            addView(district);addView(online)
+            addView(district);addView(online);addView(lite)
             addView(Button(this@MainActivity).apply{text="Apply Online / Offline";isAllCaps=false;setOnClickListener{
                 if(online.isChecked)requestGps{prefs.edit().putBoolean("online",true).putString("district",district.selectedItem.toString()).apply();val d=JSONObject().put("online",1).put("availability","AVAILABLE").put("district",district.selectedItem.toString());call({api.post("driver_status",d,token)}){ContextCompat.startForegroundService(this@MainActivity,Intent(this@MainActivity,DriverLocationService::class.java));toast("Driver Online")}}
                 else{prefs.edit().putBoolean("online",false).apply();stopService(Intent(this@MainActivity,DriverLocationService::class.java));call({api.post("driver_status",JSONObject().put("online",0).put("availability","OFFLINE").put("district",district.selectedItem.toString()),token)}){toast("Driver Offline")}}
@@ -67,6 +79,14 @@ class MainActivity:ComponentActivity(){
             addView(profile)
         },margin())
 
+        val summaryBox=TextView(this).apply{text="Loading today summary…";textSize=15f}
+        root.addView(card().apply{
+            addView(section("TODAY"))
+            addView(summaryBox)
+            addView(Button(this@MainActivity).apply{text="Refresh Today Summary";isAllCaps=false;setOnClickListener{loadTodaySummary(summaryBox,token)}})
+        },margin())
+        loadTodaySummary(summaryBox,token)
+
         root.addView(Button(this).apply {
             text="DRIVER CHAT / GROUP CHANNELS"; isAllCaps=false
             setOnClickListener {
@@ -74,7 +94,7 @@ class MainActivity:ComponentActivity(){
                     .putExtra(CommunicationActivity.EXTRA_API, prefs.getString("api",API)?:API)
                     .putExtra(CommunicationActivity.EXTRA_TOKEN, token)
                     .putExtra(CommunicationActivity.EXTRA_ROLE, "driver")
-                    .putExtra(CommunicationActivity.EXTRA_TITLE, "Driver Chat + Township Groups V5"))
+                    .putExtra(CommunicationActivity.EXTRA_TITLE, "Driver Chat + Township Groups V6 Lite"))
             }
         }, margin())
 
@@ -87,6 +107,13 @@ class MainActivity:ComponentActivity(){
 
         root.addView(Button(this).apply{text="Logout";isAllCaps=false;setOnClickListener{prefs.edit().clear().putString("api",prefs.getString("api",API)).apply();stopService(Intent(this@MainActivity,DriverLocationService::class.java));home()}},margin())
         loadProfile(profile,token);loadJobs(jobs,token)
+    }
+
+    private fun loadTodaySummary(box:TextView,token:String){
+        call({api.get("driver_today_summary",emptyMap(),token)}){j->
+            val s=j.optJSONObject("summary")?:JSONObject()
+            box.text="Trips: "+s.optInt("trips")+" • Active Jobs: "+s.optInt("active_jobs")+"\nKM: "+s.optString("total_km")+" • Fare: "+s.optString("total_fare")+" MMK"
+        }
     }
 
     private fun loadProfile(box:LinearLayout,token:String){call({api.get("member_profile",emptyMap(),token)}){j->box.removeAllViews();val m=j.optJSONObject("member")?:JSONObject();box.addView(TextView(this).apply{text=m.optString("name")+"\nMember ID: "+m.optString("member_id")+"\nDriver License: "+m.optString("driver_license")+"\nVehicle: "+m.optString("vehicle_no")+"\nCity No: "+m.optString("city_no")+"\nDistrict: "+m.optString("district")+"\nMembership Expiry: "+m.optString("membership_expires_at").ifBlank{"No expiry set"}+"\nDays Remaining: "+m.optString("membership_days_remaining")+"\nRenewal: "+m.optString("renewal_status");textSize=15f;setTextColor(if(m.optBoolean("membership_expired"))Color.parseColor("#A52A2A") else Color.parseColor("#214A45"))});box.addView(Button(this).apply{text="Request Membership Renewal";isAllCaps=false;setOnClickListener{numberPrompt("Renewal days (30-1095)"){days->postToast("renew_request",JSONObject().put("requested_days",days).put("note","Driver App renewal"),token)}}})}}
@@ -112,7 +139,7 @@ class MainActivity:ComponentActivity(){
     private fun numberPrompt(t:String,done:(Int)->Unit){val e=EditText(this).apply{inputType=InputType.TYPE_CLASS_NUMBER};AlertDialog.Builder(this).setTitle(t).setView(e).setPositiveButton("OK"){_,_->e.text.toString().toIntOrNull()?.let(done)}.setNegativeButton("Cancel",null).show()}
     private fun decimalPrompt(t:String,done:(Double)->Unit){val e=EditText(this).apply{inputType=InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL};AlertDialog.Builder(this).setTitle(t).setView(e).setPositiveButton("OK"){_,_->e.text.toString().toDoubleOrNull()?.let(done)}.setNegativeButton("Cancel",null).show()}
     private fun btn(t:String,on:()->Unit)=Button(this).apply{text=t;isAllCaps=false;setOnClickListener{on()}}
-    private fun head()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;addView(TextView(this@MainActivity).apply{text="KILO TAXI";letterSpacing=.15f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#158274"))});addView(TextView(this@MainActivity).apply{text="DRIVER V5";textSize=29f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#164D46"))});addView(TextView(this@MainActivity).apply{text="Live GPS • YCTA Membership • OTP • Trip KM";setTextColor(Color.parseColor("#5D7772"))})}
+    private fun head()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;addView(TextView(this@MainActivity).apply{text="KILO TAXI";letterSpacing=.15f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#158274"))});addView(TextView(this@MainActivity).apply{text="DRIVER V6 LITE";textSize=29f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#164D46"))});addView(TextView(this@MainActivity).apply{text="Smart GPS • Low Data • Chat • Today Summary";setTextColor(Color.parseColor("#5D7772"))})}
     private fun card()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(14),dp(14),dp(14));background=round(Color.WHITE);elevation=dp(3).toFloat()}
     private fun section(s:String)=TextView(this).apply{text=s;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#18766B"));setPadding(0,0,0,dp(6))}
     private fun edit(h:String)=EditText(this).apply{hint=h;setPadding(dp(10),dp(9),dp(10),dp(9))}
