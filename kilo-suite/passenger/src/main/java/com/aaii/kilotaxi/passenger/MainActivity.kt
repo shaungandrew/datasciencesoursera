@@ -47,16 +47,41 @@ class MainActivity:ComponentActivity(){
             addView(Button(this@MainActivity).apply{text="Call KILO TAXI";isAllCaps=false;setOnClickListener{startActivity(Intent(Intent.ACTION_DIAL,Uri.parse("tel:$CALL")))}})
         },margin())
         val url=edit("Server API URL").apply{setText(prefs.getString("api",API))}
-        root.addView(card().apply{addView(section("SERVER"));addView(url);addView(Button(this@MainActivity).apply{text="Save Server";isAllCaps=false;setOnClickListener{prefs.edit().putString("api",url.text.toString().trim()).apply();toast("Saved")}})},margin())
+        root.addView(card().apply{
+            addView(section("SERVER / LITE MODE"));addView(url)
+            addView(Switch(this@MainActivity).apply{
+                text="Lite Mode — load map only when needed"
+                isChecked=prefs.getBoolean("lite_mode",true)
+                setOnCheckedChangeListener{_,checked->prefs.edit().putBoolean("lite_mode",checked).apply();toast(if(checked)"Lite Mode ON" else "Standard Mode ON")}
+            })
+            addView(Button(this@MainActivity).apply{text="Save Server";isAllCaps=false;setOnClickListener{prefs.edit().putString("api",url.text.toString().trim()).apply();toast("Saved")}})
+        },margin())
+        favoritePlacesCard()
         bookingCard()
         trackingCard()
         fareCard()
+    }
+
+    private fun favoritePlacesCard(){
+        root.addView(card().apply{
+            addView(section("FAVORITE PLACES"))
+            addView(TextView(this@MainActivity).apply{
+                text="Home: "+prefs.getString("fav_home","Not set")+"\nWork: "+prefs.getString("fav_work","Not set")
+                textSize=14f
+            })
+            addView(Button(this@MainActivity).apply{text="Set Home";isAllCaps=false;setOnClickListener{textPrompt("Home address"){v->prefs.edit().putString("fav_home",v).apply();home()}}})
+            addView(Button(this@MainActivity).apply{text="Set Work";isAllCaps=false;setOnClickListener{textPrompt("Work address"){v->prefs.edit().putString("fav_work",v).apply();home()}}})
+        },margin())
     }
 
     private fun bookingCard(){
         val name=edit("Passenger Name");val phone=edit("Passenger Phone").apply{setText(prefs.getString("phone",""))};val district=Spinner(this).apply{adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_dropdown_item,districts)};val pickup=edit("Pickup / Landmark");val lat=edit("Pickup Latitude");val lng=edit("Pickup Longitude");val dest=edit("Destination");val dlat=edit("Destination Latitude (optional)");val dlng=edit("Destination Longitude (optional)");val out=TextView(this)
         root.addView(card().apply{
             addView(section("BOOK A TAXI"));addView(name);addView(phone);addView(district);addView(pickup)
+            val favRow=LinearLayout(this@MainActivity).apply{orientation=LinearLayout.HORIZONTAL}
+            favRow.addView(Button(this@MainActivity).apply{text="Use Home";isAllCaps=false;setOnClickListener{val v=prefs.getString("fav_home","").orEmpty();if(v.isBlank())toast("Set Home first")else pickup.setText(v)}},LinearLayout.LayoutParams(0,-2,1f))
+            favRow.addView(Button(this@MainActivity).apply{text="Use Work";isAllCaps=false;setOnClickListener{val v=prefs.getString("fav_work","").orEmpty();if(v.isBlank())toast("Set Work first")else dest.setText(v)}},LinearLayout.LayoutParams(0,-2,1f))
+            addView(favRow)
             addView(Button(this@MainActivity).apply{text="Use My Current GPS";isAllCaps=false;setOnClickListener{requestLocation{a,b->lat.setText(a.toString());lng.setText(b.toString());toast("Pickup GPS added")}}})
             addView(lat);addView(lng);addView(dest);addView(dlat);addView(dlng)
             addView(Button(this@MainActivity).apply{text="Book + Auto Find Driver";isAllCaps=false;setOnClickListener{
@@ -84,7 +109,13 @@ class MainActivity:ComponentActivity(){
 
     private fun track(code:String,phone:String,box:LinearLayout){call({api.get("passenger_track",mapOf("booking_code" to code,"passenger_phone" to phone))}){j->
         box.removeAllViews();val b=j.optJSONObject("booking")?:JSONObject();val d=b.optJSONObject("driver")?:JSONObject();box.addView(TextView(this).apply{text="Status: "+b.optString("status")+"\nPickup OTP: "+prefs.getString("otp","")+"\n"+b.optString("pickup")+" → "+b.optString("destination")+"\nDriver: "+d.optString("name")+" • "+d.optString("member_id")+" • "+d.optString("vehicle_no")+"\nDistance: "+b.optString("distance_km")+" km\nFare: "+b.optString("fare");textSize=16f})
-        val lat=d.optDouble("lat",Double.NaN);val lng=d.optDouble("lng",Double.NaN);if(!lat.isNaN()&&!lng.isNaN()){map?.onDetach();val m=MapView(this).apply{setMultiTouchControls(true);controller.setZoom(15.0);controller.setCenter(GeoPoint(lat,lng))};map=m;Marker(m).apply{position=GeoPoint(lat,lng);title="Your Driver";snippet=d.optString("vehicle_no");setAnchor(Marker.ANCHOR_CENTER,Marker.ANCHOR_BOTTOM);m.overlays.add(this)};val pLat=b.optDouble("pickup_lat",Double.NaN);val pLng=b.optDouble("pickup_lng",Double.NaN);if(!pLat.isNaN()&&!pLng.isNaN())Marker(m).apply{position=GeoPoint(pLat,pLng);title="Pickup";setAnchor(Marker.ANCHOR_CENTER,Marker.ANCHOR_BOTTOM);m.overlays.add(this)};box.addView(m,LinearLayout.LayoutParams(-1,dp(300)))}
+        val lat=d.optDouble("lat",Double.NaN);val lng=d.optDouble("lng",Double.NaN)
+        if(!lat.isNaN()&&!lng.isNaN()){
+            val pLat=b.optDouble("pickup_lat",Double.NaN);val pLng=b.optDouble("pickup_lng",Double.NaN)
+            if(prefs.getBoolean("lite_mode",true)){
+                box.addView(Button(this).apply{text="Open Live Driver Map";isAllCaps=false;setOnClickListener{showTrackingMap(box,lat,lng,d.optString("vehicle_no"),pLat,pLng)}})
+            }else showTrackingMap(box,lat,lng,d.optString("vehicle_no"),pLat,pLng)
+        }
     }}
 
     private fun openCommunication(){
@@ -94,7 +125,7 @@ class MainActivity:ComponentActivity(){
                 .putExtra(CommunicationActivity.EXTRA_API,prefs.getString("api",API)?:API)
                 .putExtra(CommunicationActivity.EXTRA_TOKEN,existing)
                 .putExtra(CommunicationActivity.EXTRA_ROLE,"passenger")
-                .putExtra(CommunicationActivity.EXTRA_TITLE,"Booking Chat + KILO Assistant V5"))
+                .putExtra(CommunicationActivity.EXTRA_TITLE,"Booking Chat + KILO Assistant V6 Lite"))
             return
         }
         val code=prefs.getString("code","").orEmpty()
@@ -111,15 +142,31 @@ class MainActivity:ComponentActivity(){
         }
     }
 
+    private fun showTrackingMap(box:LinearLayout,lat:Double,lng:Double,vehicle:String,pLat:Double,pLng:Double){
+        map?.onDetach()
+        val m=MapView(this).apply{setMultiTouchControls(true);controller.setZoom(15.0);controller.setCenter(GeoPoint(lat,lng))}
+        map=m
+        Marker(m).apply{position=GeoPoint(lat,lng);title="Your Driver";snippet=vehicle;setAnchor(Marker.ANCHOR_CENTER,Marker.ANCHOR_BOTTOM);m.overlays.add(this)}
+        if(!pLat.isNaN()&&!pLng.isNaN())Marker(m).apply{position=GeoPoint(pLat,pLng);title="Pickup";setAnchor(Marker.ANCHOR_CENTER,Marker.ANCHOR_BOTTOM);m.overlays.add(this)}
+        box.addView(m,LinearLayout.LayoutParams(-1,dp(300)))
+    }
+
     private fun fareCard(){
         val km=edit("Estimated Distance KM");val wait=edit("Waiting Minutes (optional)");val out=TextView(this)
         root.addView(card().apply{addView(section("FARE ESTIMATE"));addView(km);addView(wait);addView(Button(this@MainActivity).apply{text="Estimate Fare";isAllCaps=false;setOnClickListener{val d=JSONObject().put("distance_km",km.text.toString().toDoubleOrNull()?:0.0).put("waiting_minutes",wait.text.toString().toDoubleOrNull()?:0.0);call({api.post("passenger_fare_estimate",d)}){j->out.text="Base: "+j.optString("base_fare")+"\nRate/KM: "+j.optString("rate_per_km")+"\nEstimated Fare: "+j.optString("estimated_fare")}}});addView(out)},margin())
     }
 
+    private fun textPrompt(title:String,done:(String)->Unit){
+        val e=EditText(this)
+        android.app.AlertDialog.Builder(this).setTitle(title).setView(e)
+            .setPositiveButton("Save"){_,_->val v=e.text.toString().trim();if(v.isNotBlank())done(v)}
+            .setNegativeButton("Cancel",null).show()
+    }
+
     private fun requestLocation(done:(Double,Double)->Unit){locationDone=done;if(ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)useLastLocation()else perm.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION))}
     private fun useLastLocation(){if(ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED&&ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED)return;val lm=getSystemService(LOCATION_SERVICE) as LocationManager;val l=runCatching{lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)?:lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)}.getOrNull();if(l!=null)locationDone?.invoke(l.latitude,l.longitude)else toast("Current GPS not available yet.");locationDone=null}
     private fun call(fn:()->JSONObject,done:(JSONObject)->Unit){thread{val r=runCatching(fn).getOrElse{JSONObject().put("ok",false).put("error",it.message?:"Network error")};runOnUiThread{if(r.optBoolean("ok"))done(r)else toast(r.optString("error","Request failed"))}}}
-    private fun head()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;addView(TextView(this@MainActivity).apply{text="KILO TAXI";letterSpacing=.15f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#B36A12"))});addView(TextView(this@MainActivity).apply{text="PASSENGER V5";textSize=29f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#674313"))});addView(TextView(this@MainActivity).apply{text="Book • OTP • Track Driver • Fare"})}
+    private fun head()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;addView(TextView(this@MainActivity).apply{text="KILO TAXI";letterSpacing=.15f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#B36A12"))});addView(TextView(this@MainActivity).apply{text="PASSENGER V6 LITE";textSize=29f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#674313"))});addView(TextView(this@MainActivity).apply{text="Low Data • Favorite Places • Booking Chat • Track"})}
     private fun card()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(14),dp(14),dp(14));background=round(Color.WHITE);elevation=dp(3).toFloat()}
     private fun section(s:String)=TextView(this).apply{text=s;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#9B5C0B"));setPadding(0,0,0,dp(6))}
     private fun edit(h:String)=EditText(this).apply{hint=h;setPadding(dp(10),dp(9),dp(10),dp(9))}
