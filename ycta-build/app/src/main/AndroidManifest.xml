@@ -6,7 +6,9 @@
 
     <application
         android:allowBackup="false"
-        android:label="YCTA Taxi Digital Member + Library"
+        android:label="YCTA Taxi Association"
+        android:icon="@drawable/ycta_logo"
+        android:roundIcon="@drawable/ycta_logo"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity android:name=".TownshipMembersActivity" android:exported="false" />
@@ -17,7 +19,8 @@
         <activity android:name=".PdfReaderActivity" android:exported="false" />
         <activity android:name=".BookDetailActivity" android:exported="false" />
         <activity android:name=".LibraryActivity" android:exported="false" />
-        <activity android:name=".MainActivity" android:exported="true">
+        <activity android:name=".MainActivity" android:exported="false" />
+        <activity android:name=".SplashActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
