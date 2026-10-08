@@ -9,8 +9,8 @@ android {
         applicationId = "com.aaii.kilotaxi.driver"
         minSdk = 24
         targetSdk = 35
-        versionCode = 61
-        versionName = "6.1.0"
+        versionCode = 62
+        versionName = "6.2.0"
     }
     buildTypes { release { isMinifyEnabled = false } }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
