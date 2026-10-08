@@ -168,6 +168,16 @@ class MainActivity : ComponentActivity() {
                 }
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
 
+            addView(Button(this@MainActivity).apply {
+                text = "MOOC • Native Learning Hub"
+                isAllCaps = false
+                setTextColor(Color.WHITE)
+                backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#0C6EA8"))
+                setOnClickListener {
+                    startActivity(Intent(this@MainActivity, MoocActivity::class.java))
+                }
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+
             progress = ProgressBar(this@MainActivity).apply { visibility = View.GONE }
             addView(progress, LinearLayout.LayoutParams(-2, -2).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
