@@ -1,9 +1,9 @@
-name: KILO TAXI Driver V6.1 Hotfix APK
+name: KILO TAXI Driver Native V6.2 APK
 
 on:
   push:
     branches:
-      - 'chatgpt-kilotaxi-driver-v6-1-hotfix-*'
+      - 'chatgpt-kilotaxi-driver-native-v6-2-*'
 
 permissions:
   contents: read
@@ -20,14 +20,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build Driver V6.1
+      - name: Build Driver Native V6.2
         run: |
           cd kilo-suite
           gradle --no-daemon :driver:assembleDebug --stacktrace
-          cp driver/build/outputs/apk/debug/driver-debug.apk ../KILO_TAXI_Driver_V6_1_Lite.apk
-      - name: Upload Driver V6.1 APK
+          cp driver/build/outputs/apk/debug/driver-debug.apk ../KILO_TAXI_Driver_Native_V6_2.apk
+      - name: Upload Driver Native V6.2 APK
         uses: actions/upload-artifact@v4
         with:
-          name: KILO_TAXI_Driver_V6_1_Lite_APK
-          path: KILO_TAXI_Driver_V6_1_Lite.apk
+          name: KILO_TAXI_Driver_Native_V6_2_APK
+          path: KILO_TAXI_Driver_Native_V6_2.apk
           if-no-files-found: error
