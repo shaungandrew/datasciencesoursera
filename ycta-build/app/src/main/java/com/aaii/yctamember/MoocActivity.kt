@@ -2,6 +2,7 @@ package com.aaii.yctamember
 
 import android.app.AlertDialog
 import android.content.Intent
+import android.net.Uri
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
@@ -112,7 +113,7 @@ class MoocActivity : ComponentActivity() {
             addView(top)
 
             status = TextView(this@MoocActivity).apply {
-                text = "Source: https://www.aaii.asia/edu/mooc"
+                text = "Source: https://aaii.asia/edu/mooc/"
                 textSize = 11.5f
                 setTextColor(Color.parseColor("#667B8D"))
                 gravity = Gravity.CENTER
@@ -647,13 +648,25 @@ class MoocActivity : ComponentActivity() {
                             } else showSearch()
                             else -> showHome()
                         }
-                    }.onFailure {
-                        status.text = "Login failed: ${it.message}"
+                    }.onFailure { issue ->
+                        val isDnsFailure = generateSequence(issue) { it.cause }
+                            .any { it is java.net.UnknownHostException }
+                        status.text = if (isDnsFailure)
+                            "MOOC network/DNS error. Try opening the website in Chrome."
+                        else "Login failed: ${issue.message}"
                         val safeDiagnostics = api.loginDiagnostics()
+                        val guide = if (isDnsFailure)
+                            "\n\nThis is a DNS/network issue, NOT a wrong password or Device ID. " +
+                            "Try Chrome, switch between Wi-Fi and mobile data, or check Private DNS settings."
+                        else ""
                         AlertDialog.Builder(this@MoocActivity)
-                            .setTitle("MOOC Login Diagnostics")
-                            .setMessage((it.message ?: "Login failed") + "\n\n" + safeDiagnostics +
+                            .setTitle(if (isDnsFailure) "MOOC Network / DNS Error" else "MOOC Login Diagnostics")
+                            .setMessage((issue.message ?: "Login failed") + "\n\n" +
+                                safeDiagnostics + guide +
                                 "\n\nNo passwords, tokens, or cookie values are displayed.")
+                            .setNeutralButton("Open MOOC Website") { _, _ ->
+                                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(MoocApi.WEB_BASE)))
+                            }
                             .setPositiveButton("OK", null)
                             .show()
                     }
