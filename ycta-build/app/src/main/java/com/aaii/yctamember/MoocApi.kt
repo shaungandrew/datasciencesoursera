@@ -236,7 +236,7 @@ class MoocApi(private val context: Context) {
             }
             endpoints.forEach { endpoint ->
                 val found = runCatching {
-                    parseSingleCourse(get(endpoint), course.sourceType.ifBlank { "mooc" })
+                    parseSingleCourse(get(endpoint), course.sourceType.ifBlank { "mooc" }, course.id)
                 }.getOrNull()
                 // A detail endpoint may return only a link (without a title).
                 if (found != null &&
@@ -406,18 +406,55 @@ class MoocApi(private val context: Context) {
         }
     }
 
-    private fun parseSingleCourse(text: String, source: String): Course? {
+    private fun parseSingleCourse(
+        text: String, source: String, expectedId: String
+    ): Course? {
         val root = parseAny(text)
-        if (root is JSONObject) {
-            listOf("course", "item", "data", "result").forEach { k ->
-                root.optJSONObject(k)?.let { return objectToCourse(it, source) }
+
+        fun fromObject(obj: JSONObject): Course {
+            val course = objectToCourse(obj, source)
+            // For a course-detail response, lesson/video links can appear
+            // beside a nested "course" object rather than inside it.
+            val nestedUrl = resolveCourseUrl(obj, source)
+            return if (course.url.isBlank() && nestedUrl.isNotBlank())
+                course.copy(url = nestedUrl) else course
+        }
+
+        if (root is JSONArray) {
+            for (i in 0 until root.length()) {
+                val obj = root.optJSONObject(i) ?: continue
+                val c = fromObject(obj)
+                if (c.id == expectedId) return c
             }
-            return objectToCourse(root, source)
+            return null
         }
-        if (root is JSONArray && root.length() > 0) {
-            return root.optJSONObject(0)?.let { objectToCourse(it, source) }
+        if (root !is JSONObject) return null
+
+        // A list endpoint may ignore ?id= and return many unrelated rows;
+        // only use a row whose ID matches the requested course.
+        val isList = listOf("courses", "items", "results", "records", "posts", "sources")
+            .any { root.optJSONArray(it) != null }
+        if (isList) {
+            val rows = findArray(root) ?: return null
+            for (i in 0 until rows.length()) {
+                val item = rows.optJSONObject(i) ?: continue
+                val c = fromObject(item)
+                if (c.id == expectedId) return c
+            }
+            return null
         }
-        return null
+
+        for (key in listOf("course", "item", "data", "result")) {
+            val nested = root.optJSONObject(key) ?: continue
+            val c = fromObject(nested)
+            if (c.id.isNotBlank() && c.id != expectedId) continue
+            // Keep lesson/video link from outer wrapper when it is present.
+            val outer = resolveCourseUrl(root, source)
+            return if (c.url.isBlank() && outer.isNotBlank()) c.copy(url = outer) else c
+        }
+        val c = fromObject(root)
+        if (c.id.isNotBlank() && c.id != expectedId) return null
+        return c
     }
 
     private fun parseCategories(text: String): List<Category> {
