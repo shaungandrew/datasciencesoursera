@@ -29,6 +29,8 @@ class TownshipMembersActivity : ComponentActivity() {
     private var district: YctaGeography.District? = null
     private var township: YctaGeography.Township? = null
     private var generation = 0
+    private var showingMemberList = false
+    private var currentPage = 1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,8 +81,12 @@ class TownshipMembersActivity : ComponentActivity() {
         bottom.addView(nav("← Back") { goBack() })
         bottom.addView(nav("Districts") { showDistricts() })
         bottom.addView(nav("Refresh") {
-            val selected = township
-            if (selected == null) showDistricts() else loadMembers(selected)
+            val d = district
+            when {
+                showingMemberList -> loadPage(township, currentPage)
+                d != null -> showTownships(d)
+                else -> showDistricts()
+            }
         })
         root.addView(bottom)
         setContentView(root)
@@ -116,6 +122,7 @@ class TownshipMembersActivity : ComponentActivity() {
         val seq = ++generation
         loading.visibility = View.VISIBLE
         district = null; township = null
+        showingMemberList = false
         heading.text = "ခရိုင် ၁၄ ခု"
         summary.text = "14 Districts • 44 Townships • SQL Mobile API"
         content.removeAllViews()
@@ -142,6 +149,7 @@ class TownshipMembersActivity : ComponentActivity() {
     private fun showTownships(d: YctaGeography.District) {
         val seq = ++generation
         district = d; township = null
+        showingMemberList = false
         heading.text = d.myanmar+" ခရိုင်"
         summary.text = d.english+" • ${d.townships.size} Townships"
         loading.visibility = View.VISIBLE
@@ -185,6 +193,8 @@ class TownshipMembersActivity : ComponentActivity() {
         val d=district ?: return
         val seq=++generation
         township=t
+        showingMemberList = true
+        currentPage = page
         heading.text=(t?.myanmar ?: d.myanmar)+" • Members"
         summary.text="SQL-linked YCTA Directory • Page $page"
         loading.visibility=View.VISIBLE
@@ -278,7 +288,8 @@ class TownshipMembersActivity : ComponentActivity() {
 
     private fun goBack() {
         when {
-            township != null -> district?.let { showTownships(it) } ?: showDistricts()
+            showingMemberList ->
+                district?.let { showTownships(it) } ?: showDistricts()
             district != null -> showDistricts()
             else -> finish()
         }
