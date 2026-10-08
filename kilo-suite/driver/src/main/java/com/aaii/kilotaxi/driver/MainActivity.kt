@@ -1,6 +1,7 @@
 package com.aaii.kilotaxi.driver
 
 import android.Manifest
+import com.aaii.kilotaxi.common.CommunicationActivity
 import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -66,6 +67,17 @@ class MainActivity:ComponentActivity(){
             addView(profile)
         },margin())
 
+        root.addView(Button(this).apply {
+            text="DRIVER CHAT / GROUP CHANNELS"; isAllCaps=false
+            setOnClickListener {
+                startActivity(Intent(this@MainActivity, CommunicationActivity::class.java)
+                    .putExtra(CommunicationActivity.EXTRA_API, prefs.getString("api",API)?:API)
+                    .putExtra(CommunicationActivity.EXTRA_TOKEN, token)
+                    .putExtra(CommunicationActivity.EXTRA_ROLE, "driver")
+                    .putExtra(CommunicationActivity.EXTRA_TITLE, "Driver Chat + Township Groups V5"))
+            }
+        }, margin())
+
         val jobs=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
         root.addView(card().apply{
             addView(section("ASSIGNED TAXI JOBS"))
@@ -100,7 +112,7 @@ class MainActivity:ComponentActivity(){
     private fun numberPrompt(t:String,done:(Int)->Unit){val e=EditText(this).apply{inputType=InputType.TYPE_CLASS_NUMBER};AlertDialog.Builder(this).setTitle(t).setView(e).setPositiveButton("OK"){_,_->e.text.toString().toIntOrNull()?.let(done)}.setNegativeButton("Cancel",null).show()}
     private fun decimalPrompt(t:String,done:(Double)->Unit){val e=EditText(this).apply{inputType=InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL};AlertDialog.Builder(this).setTitle(t).setView(e).setPositiveButton("OK"){_,_->e.text.toString().toDoubleOrNull()?.let(done)}.setNegativeButton("Cancel",null).show()}
     private fun btn(t:String,on:()->Unit)=Button(this).apply{text=t;isAllCaps=false;setOnClickListener{on()}}
-    private fun head()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;addView(TextView(this@MainActivity).apply{text="KILO TAXI";letterSpacing=.15f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#158274"))});addView(TextView(this@MainActivity).apply{text="DRIVER V4";textSize=29f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#164D46"))});addView(TextView(this@MainActivity).apply{text="Live GPS • YCTA Membership • OTP • Trip KM";setTextColor(Color.parseColor("#5D7772"))})}
+    private fun head()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;addView(TextView(this@MainActivity).apply{text="KILO TAXI";letterSpacing=.15f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#158274"))});addView(TextView(this@MainActivity).apply{text="DRIVER V5";textSize=29f;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#164D46"))});addView(TextView(this@MainActivity).apply{text="Live GPS • YCTA Membership • OTP • Trip KM";setTextColor(Color.parseColor("#5D7772"))})}
     private fun card()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(14),dp(14),dp(14),dp(14));background=round(Color.WHITE);elevation=dp(3).toFloat()}
     private fun section(s:String)=TextView(this).apply{text=s;setTypeface(typeface,Typeface.BOLD);setTextColor(Color.parseColor("#18766B"));setPadding(0,0,0,dp(6))}
     private fun edit(h:String)=EditText(this).apply{hint=h;setPadding(dp(10),dp(9),dp(10),dp(9))}
