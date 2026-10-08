@@ -43,7 +43,9 @@ class MoocApi(private val context: Context) {
     )
 
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val sessionCookies = MoocSessionCookieJar()
     private val client = OkHttpClient.Builder()
+        .cookieJar(sessionCookies)
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(35, TimeUnit.SECONDS)
         .followRedirects(true)
@@ -81,15 +83,21 @@ class MoocApi(private val context: Context) {
             data.put("identifier", username.trim())
             data.put("password", password)
         }
-        data.put("device_id", deviceId())
+        val stableDeviceId = deviceId().trim()
+        data.put("device_id", stableDeviceId)
         data.put("device_label", deviceLabel())
+
+        // Initialize the same first-party PHP session/cookies used by the MOOC site.
+        sessionCookies.setDeviceCookie(stableDeviceId)
+        initializeSession(stableDeviceId)
+
         val request = Request.Builder()
             .url(API_BASE + "login.php")
             .post(data.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .header("Accept", "application/json")
             .header("Referer", WEB_BASE)
             .header("X-Device-ID", deviceId())
-            .header("User-Agent", "YCTA-MOOC-Native/6.2 Android")
+            .header("User-Agent", "YCTA-MOOC-Native/6.3 Android")
             .build()
         val text = execute(request)
         val obj = parseObject(text)
@@ -100,6 +108,24 @@ class MoocApi(private val context: Context) {
         }
         prefs.edit().putString(TOKEN, found).apply()
         return found
+    }
+
+    private fun initializeSession(device: String) {
+        // A failed bootstrap should not hide the actual login response.
+        runCatching {
+            val request = Request.Builder()
+                .url("https://aaii.asia/edu/mooc/")
+                .get()
+                .header("Accept", "text/html,application/xhtml+xml,*/*")
+                .header("X-Device-ID", device)
+                .header("User-Agent", "YCTA-MOOC-Native/6.3 Android")
+                .build()
+            client.newCall(request).execute().use { response ->
+                response.body?.close()
+            }
+        }
+        // In case the site returned a new PHPSESSID, keep device binding.
+        sessionCookies.setDeviceCookie(device)
     }
 
     fun fetchCourses(source: String, force: Boolean = false): List<Course> {
@@ -270,7 +296,7 @@ class MoocApi(private val context: Context) {
             .url(url)
             .header("Accept", "application/json,*/*")
             .header("Referer", WEB_BASE)
-            .header("User-Agent", "YCTA-MOOC-Native/6.2 Android")
+            .header("User-Agent", "YCTA-MOOC-Native/6.3 Android")
             .header("X-Device-ID", deviceId())
         val t = token()
         if (t.isNotBlank()) {
