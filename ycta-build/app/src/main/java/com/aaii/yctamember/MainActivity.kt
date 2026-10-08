@@ -95,16 +95,7 @@ class MainActivity : ComponentActivity() {
 
         val apiMemberId = intent?.getLongExtra("mobile_api_member_id", -1L) ?: -1L
         if (apiMemberId > 0L) {
-            loading(true)
-            status.text = "Loading SQL member profile…"
-            lifecycleScope.launch {
-                val result = withContext(Dispatchers.IO) {
-                    runCatching { YctaMobileApi().member(apiMemberId).asMember() }
-                }
-                result.onSuccess(::openSmartCard)
-                    .onFailure { status.text = "Mobile API profile error: ${it.message}" }
-                loading(false)
-            }
+            openApiMember(apiMemberId)
         } else {
             intent?.getStringExtra("member_profile_url")
                 ?.takeIf { it.isNotBlank() }
@@ -171,7 +162,7 @@ class MainActivity : ComponentActivity() {
             }
 
             input = EditText(this@MainActivity).apply {
-                hint = "Member ID / Name / Profile URL"
+                hint = "Search YCTA SQL by Member ID / Name"
                 textSize = 16f
                 isSingleLine = true
                 imeOptions = EditorInfo.IME_ACTION_SEARCH
@@ -271,7 +262,7 @@ class MainActivity : ComponentActivity() {
             })
 
             status = TextView(this@MainActivity).apply {
-                text = "Supports 45/0118, 450118, ycta450118 and member profile QR."
+                text = "SQL Search: Member ID, Member Name or Scan QR."
                 textSize = 13f
                 setTextColor(Color.parseColor("#60758A"))
                 setPadding(0, dp(12), 0, dp(10))
@@ -292,6 +283,9 @@ class MainActivity : ComponentActivity() {
             addView(right, LinearLayout.LayoutParams(0, dp(126), 1f).apply {
                 marginStart = dp(6)
             })
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(12)
+            }
         }
 
     private fun dashboardCard(iconText: String, name: String, caption: String,
@@ -345,23 +339,121 @@ class MainActivity : ComponentActivity() {
     private fun doSearch(raw: String) {
         val q = raw.trim()
         if (q.isEmpty()) {
-            status.text = "Please enter a member ID, name, or profile URL."
+            status.text = "Enter a member ID or name."
             return
         }
+        val directId = if (q.contains("mobile-api/v1/") && q.contains("action=member")) {
+            Regex("[?&]id=(\\d+)").find(q)?.groupValues?.getOrNull(1)?.toLongOrNull()
+        } else null
+        if (directId != null) {
+            openApiMember(directId)
+            return
+        }
+        // QR codes issued by the old YCTA WordPress directory can still
+        // open their original member profile. All ordinary searches use SQL.
+        if (q.startsWith("https://") || q.startsWith("http://")) {
+            searchLegacyQr(q)
+            return
+        }
+        searchSqlPage(q, 1)
+    }
 
+    private fun searchSqlPage(q: String, page: Int) {
         loading(true)
         results.removeAllViews()
-        status.text = "Searching member…"
-
+        status.text = "Searching YCTA member database • page $page…"
         lifecycleScope.launch {
-            when (val found = withContext(Dispatchers.IO) { repository.search(q) }) {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { mobileApi.search(q, page) }
+            }
+            result.onSuccess { p ->
+                status.text = "${p.total} SQL matching members • page ${p.page}"
+                if (p.members.isEmpty()) {
+                    status.text = "No matching members in SQL. Try another name or member ID."
+                }
+                p.members.forEach { row ->
+                    val sub = "${row.code}   •   ${row.district}" +
+                        (row.township?.let { "   •   $it" } ?: "   •   Township unassigned")
+                    val item = MemberSummary(
+                        row.name.ifBlank { "YCTA Member" }, sub,
+                        row.id.toString()
+                    )
+                    val c = LinearLayout(this@MainActivity).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(dp(14), dp(12), dp(14), dp(12))
+                        elevation = dp(2).toFloat()
+                        background = rounded(Color.WHITE, 16, "#D9E3EC", 1)
+                        setOnClickListener { openApiMember(row.id) }
+                        isClickable = true
+                        isFocusable = true
+                    }
+                    c.addView(TextView(this@MainActivity).apply {
+                        text = item.title
+                        textSize = 17f
+                        setTextColor(Color.parseColor("#143C5C"))
+                        setTypeface(typeface, Typeface.BOLD)
+                    })
+                    c.addView(TextView(this@MainActivity).apply {
+                        text = item.subtitle
+                        textSize = 12f
+                        setTextColor(Color.parseColor("#677E91"))
+                        setPadding(0, dp(5), 0, 0)
+                    })
+                    results.addView(c, LinearLayout.LayoutParams(-1, -2).apply {
+                        bottomMargin = dp(10)
+                    })
+                }
+                if (page > 1) {
+                    results.addView(Button(this@MainActivity).apply {
+                        text = "← Previous results"
+                        isAllCaps = false
+                        setOnClickListener { searchSqlPage(q, page - 1) }
+                    })
+                }
+                if (p.more) {
+                    results.addView(Button(this@MainActivity).apply {
+                        text = "Load next 25 results →"
+                        isAllCaps = false
+                        setOnClickListener { searchSqlPage(q, page + 1) }
+                    })
+                }
+            }.onFailure {
+                status.text = "YCTA SQL Mobile API search failed: ${it.message}. " +
+                    "Deploy API V1.5 on ycta.aaii.asia and finish Sync SQL Members."
+            }
+            loading(false)
+        }
+    }
+
+    private fun searchLegacyQr(q: String) {
+        loading(true)
+        status.text = "Verifying older YCTA member QR…"
+        results.removeAllViews()
+        lifecycleScope.launch {
+            val found = withContext(Dispatchers.IO) { repository.search(q) }
+            when (found) {
                 is SearchOutcome.Direct -> openSmartCard(found.member)
                 is SearchOutcome.Results -> {
-                    status.text = found.members.size.toString() + " member(s) found."
+                    status.text = "${found.members.size} legacy QR matches."
                     found.members.forEach(::renderSearchResult)
                 }
                 is SearchOutcome.Failure -> status.text = found.message
             }
+            loading(false)
+        }
+    }
+
+    private fun openApiMember(id: Long) {
+        loading(true)
+        status.text = "Loading YCTA SQL member profile…"
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { mobileApi.member(id).asMember() }
+            }
+            result.onSuccess(::openSmartCard)
+                .onFailure {
+                    status.text = "SQL member profile unavailable: ${it.message}"
+                }
             loading(false)
         }
     }
