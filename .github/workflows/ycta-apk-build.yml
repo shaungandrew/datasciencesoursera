@@ -1,9 +1,9 @@
-name: YCTA APK Build V6.7 Native Video Player
+name: YCTA APK Build V6.8 District Township Members
 
 on:
   push:
     branches:
-      - 'chatgpt-ycta-v67-native-video-*'
+      - 'chatgpt-ycta-v68-district-township-members-*'
 
 permissions:
   contents: read
@@ -24,10 +24,10 @@ jobs:
         run: |
           cd ycta-build
           gradle --no-daemon :app:assembleDebug --stacktrace
-          cp app/build/outputs/apk/debug/app-debug.apk ../YCTA_Member_Native_V6_7_MOOC_NativeVideoPlayer.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../YCTA_Member_Native_V6_8_14District_44Township.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: YCTA_Member_Native_V6_7_MOOC_NativeVideoPlayer_APK
-          path: YCTA_Member_Native_V6_7_MOOC_NativeVideoPlayer.apk
+          name: YCTA_Member_Native_V6_8_14District_44Township_APK
+          path: YCTA_Member_Native_V6_8_14District_44Township.apk
           if-no-files-found: error
