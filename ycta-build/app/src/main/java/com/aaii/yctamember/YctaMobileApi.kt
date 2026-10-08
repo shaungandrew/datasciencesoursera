@@ -13,9 +13,10 @@ class YctaMobileApi {
     data class DistrictCount(val slug: String, val count: Int, val unassigned: Int)
     data class TownCount(val slug: String, val count: Int)
     data class Row(val id: Long, val code: String, val name: String,
-                   val district: String, val township: String?) {
+                   val district: String, val township: String?, val photoUrl: String?) {
         fun asMember() = Member(
             name = name, memberId = code, district = district,
+            photoUrls = listOfNotNull(photoUrl?.takeIf { it.startsWith("https://") }),
             maskedPhone = "Protected", maskedNrc = "Protected",
             maskedAddress = "Protected",
             profileUrl = "$BASE?action=member&id=$id"
@@ -68,13 +69,15 @@ class YctaMobileApi {
         val items=(0 until a.length()).map { i ->
             val r=a.getJSONObject(i)
             Row(r.optLong("id"),r.optString("member_code"),r.optString("name"),
-                r.optString("district"),r.optString("township_slug").takeIf { it.isNotBlank() && it!="null" })
+                r.optString("district"),r.optString("township_slug").takeIf { it.isNotBlank() && it!="null" },
+                r.optString("photo_url").takeIf { it.startsWith("https://") })
         }
         return Page(j.optInt("total"),j.optInt("page",page),j.optBoolean("has_more"),j.optString("note"),items)
     }
     fun member(id: Long): Row {
         val r=get("action" to "member","id" to id.toString()).getJSONObject("member")
         return Row(r.optLong("id"),r.optString("member_code"),r.optString("name"),
-          r.optString("district"),r.optString("township_slug").takeIf { it.isNotBlank() && it!="null" })
+          r.optString("district"),r.optString("township_slug").takeIf { it.isNotBlank() && it!="null" },
+                r.optString("photo_url").takeIf { it.startsWith("https://") })
     }
 }
