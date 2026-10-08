@@ -8,6 +8,7 @@ data class Member(
     val vehicleNo: String = "",
     val cityNo: String = "",
     val district: String = "",
+    val membershipStatus: String = "",
     val photoUrls: List<String> = emptyList(),
     val maskedPhone: String = "",
     val maskedNrc: String = "",
