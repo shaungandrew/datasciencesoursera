@@ -245,12 +245,24 @@ class MoocActivity : ComponentActivity() {
         }
 
         lifecycleScope.launch {
-            val counts = withContext(Dispatchers.IO) {
-                listOf("mooc", "youtube", "drive", "freehub").associateWith {
-                    runCatching { api.fetchCourses(it, false).size }.getOrDefault(0)
+            val countResult = withContext(Dispatchers.IO) {
+                runCatching {
+                    listOf("mooc", "youtube", "drive", "freehub").associateWith { source ->
+                        try {
+                            api.fetchCourses(source, false).size
+                        } catch (e: MoocApi.AuthException) {
+                            throw e
+                        } catch (e: Exception) {
+                            -1
+                        }
+                    }
                 }
             }
-            status.text = "MOOC ${counts["mooc"] ?: 0} • YouTube ${counts["youtube"] ?: 0} • Drive ${counts["drive"] ?: 0} • Free Hub ${counts["freehub"] ?: 0}"
+            countResult.onSuccess { counts ->
+                fun display(key: String): String =
+                    counts[key]?.takeIf { it >= 0 }?.toString() ?: "—"
+                status.text = "MOOC ${display("mooc")} • YouTube ${display("youtube")} • Drive ${display("drive")} • Free Hub ${display("freehub")}"
+            }.onFailure(::handleError)
         }
     }
 
