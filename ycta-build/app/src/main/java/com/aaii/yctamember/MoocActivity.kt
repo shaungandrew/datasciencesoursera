@@ -649,7 +649,13 @@ class MoocActivity : ComponentActivity() {
                         }
                     }.onFailure {
                         status.text = "Login failed: ${it.message}"
-                        Toast.makeText(this@MoocActivity, it.message ?: "Login failed", Toast.LENGTH_LONG).show()
+                        val safeDiagnostics = api.loginDiagnostics()
+                        AlertDialog.Builder(this@MoocActivity)
+                            .setTitle("MOOC Login Diagnostics")
+                            .setMessage((it.message ?: "Login failed") + "\n\n" + safeDiagnostics +
+                                "\n\nNo passwords, tokens, or cookie values are displayed.")
+                            .setPositiveButton("OK", null)
+                            .show()
                     }
                 }
             }
