@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
 class MoocApi(private val context: Context) {
     companion object {
         const val WEB_BASE = "https://www.aaii.asia/edu/mooc/"
-        const val API_BASE = "https://www.aaii.asia/edu/mooc/api/"
+        const val API_BASE = "https://aaii.asia/edu/mooc/api/"
         private const val PREFS = "ycta_mooc_module"
         private const val TOKEN = "token"
     }
@@ -51,7 +51,7 @@ class MoocApi(private val context: Context) {
     fun clearToken() = prefs.edit().remove(TOKEN).apply()
     fun lastSync(source: String): Long = prefs.getLong("sync_$source", 0L)
 
-    private fun token(): String = prefs.getString(TOKEN, "").orEmpty()
+    private fun token(): String = prefs.getString(TOKEN, "").orEmpty().trim()
 
     private fun deviceId(): String =
         Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
